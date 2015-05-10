@@ -1,0 +1,25 @@
+{
+  "name": "bytewise-space",
+  "version": "0.0.0",
+  "description": "Efficient keypath subspaces with bytewise tuples",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/deanlandolt/bytewise-space.git"
+  },
+  "keywords": [
+    "level",
+    "sublevel",
+    "bytewise",
+    "namespace"
+  ],
+  "author": "Dean Landolt <dean@deanlandolt.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/deanlandolt/bytewise-space/issues"
+  },
+  "homepage": "https://github.com/deanlandolt/bytewise-space"
+}
