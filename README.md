@@ -15,7 +15,7 @@ var options = {
 }
 
 // same API as levelup
-var appDb = space(db, 'myapp', options);
+var appDb = space(db, 'myapp', options)
 
 // you can mount subspaces within subspaces
 var nestedDb = space(myapp, 'nested')
@@ -26,7 +26,7 @@ var testDb = space(appDb, new Date())
 
 ## Rooted keypaths
 
-The subspace db instance itself is essentially a keyspace `chroot` -- a jail you cannot escape with a reference to the subspace alone. The subspace must be provided a reference to soem backing db, but it does not surface this reference and none of its methods will allow access outside of its namespace.
+The subspace db instance itself is essentially a keyspace `chroot` -- a jail you cannot escape with a reference to the subspace alone. The subspace must be provided a reference to a backing db, but it will not surface this reference and none of its methods will allow access to anything outside of its namespace.
 
 
 ## Nested subspaces
