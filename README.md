@@ -36,9 +36,11 @@ When instantiating a subspace, it will check the provided `db` for a `mountSubsp
 
 ## Encoding
 
+*NOTE: NYI*
+
 Subspace keys are encoded as length-prefixed arrays. This allows subspace keys to be appended as the last element of a namespace without the overhead required to escape certain bytes in regular arrays. Encoded subspace keys can be appended to the precomputed namespace buffer with a single `Buffer.concat` operation. Keys of a top level subspace would be two element tuple, the first element being the namespace key. Mounting a subspace adds another element to this tuple. The last element is always the subspace-specific key of each record. This serialization ensures that keys of different subspaces cannot possibly interleave, while allowing for inexpensive key manipulation. When encoding keys, the encoded namespace buffer can be efficiently concatenated with a subspace key. When decoding, the namespace portion can be slice off and ignored.
 
 
-## Subspace keys
+### Subspace keys
 
 The last element of the keypath tuple -- the subspace key -- is serialized as a buffer and concatenated to the namespace buffer. If you're using bytewise keys in your subspace you will end up with a complete keypath that's correctly bytewise-encoded. If using another encoding, the final keypath cannot be decoded directly in bytewise, but the fact that keys are length-prefixed should be enough of a clue for tooling (e.g. levelui) to treat the last element as an opaque buffer, just as if it were a top level key.
