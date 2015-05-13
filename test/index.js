@@ -64,8 +64,16 @@ function dbWrap (testFn) {
 function hex(key) {
   return Buffer(key).toString('hex')
 }
+
 function bwHex(ns, key) {
-  return bytewise.encode([ ns, Buffer(key) ]).toString('hex')
+  return bwKey(ns, key).toString('hex')
+}
+
+function bwKey(ns, key) {
+  if (typeof key === 'string')
+    key = Buffer(key)
+
+  return Buffer.concat([ bytewise.encode(ns), key ])
 }
 
 
@@ -197,6 +205,40 @@ test('test gets @ multiple levels', dbWrap(function (t, ldb) {
   dbs.forEach(function (db, i) {
     db.put('foo' + i, 'bar' + i, done)
     db.put('bar' + i, 'foo' + i, done)
+  })
+}))
+
+
+test('test gets w/ alt keyEncoding', dbWrap(function (t, ldb) {
+  var dbs = [
+    ldb,
+    space(ldb, 'test space 1'),
+    space(ldb, 'test space 2'),
+  ]
+  var done = after(dbs.length * 2, verify)
+
+  function verify (err) {
+    t.ifError(err, 'no error')
+
+    var done = after(dbs.length * 2, t.end)
+
+    dbs.forEach(function (db, i) {
+      db.get(bytewise.encode([ 'foo', i ]), function (err, value) {
+        t.ifError(err, 'no error')
+        t.equal(value, 'bar' + i, 'got expected value')
+        done()
+      })
+      db.get(bytewise.encode([ 'bar', i ]), { keyEncoding: 'binary' }, function (err, value) {
+        t.ifError(err, 'no error')
+        t.equal(value, 'foo' + i, 'got expected value')
+        done()
+      })
+    })
+  }
+
+  dbs.forEach(function (db, i) {
+    db.put(bytewise.encode([ 'foo', i ]), 'bar' + i, done)
+    db.put(bytewise.encode([ 'bar', i ]), 'foo' + i, done)
   })
 }))
 
@@ -525,7 +567,7 @@ test('explicit json on db valueEncoding raw entry', dbWrap(function (t, ldb) {
   sdb.put('thing', thing, function (err) {
     t.error(err)
 
-    ldb.get(bytewise.encode([ [ 'json-things' ], Buffer('thing') ]), {
+    ldb.get(bwKey([ 'json-things' ], 'thing'), {
       valueEncoding: 'utf8'
     }, function (err, value) {
       t.error(err)
@@ -546,7 +588,7 @@ test('explicit json on put valueEncoding raw entry', dbWrap(function (t, ldb) {
   }, function (err) {
     t.error(err)
 
-    ldb.get(bytewise.encode([ [ 'json-things' ], Buffer('thing') ]), {
+    ldb.get(bwKey([ 'json-things' ], 'thing'), {
       valueEncoding: 'utf8'
     }, function (err, value) {
       t.error(err)

@@ -11,28 +11,29 @@ var arrayBoundary = bytewise.sorts.array.bound
 //
 function Namespace(path) {
   this.path = path
-  this.prefix = bytewise.encode(arrayBoundary.lower([ path ]))
+  this.prefix = bytewise.encode(path)
 }
 
 Namespace.prototype.append = function (sub) {
   return new Namespace(this.path.concat(sub))
 }
 
-Namespace.prototype.encode = function (key, options) {
-  // TODO: respect `options.keyEncoding`, optimize on bw keys to avoid double-encode
-  return bytewise.encode([ this.path, key ])
+Namespace.prototype.contains = function (key) {
+  return compare(this.prefix, key.slice(0, this.prefix.length)) === 0
 }
 
 Namespace.prototype.decode = function (key, options) {
+  if (!this.contains(key))
+    return key
+
   //
-  // slice off namespace portion before decoding
+  // slice off namespace prefix and return
   //
-  var buffer = key.slice(this.prefix.length, -2)
-  return this.contains(key) ? bytewise.decode(buffer, { nested: true }) : key
+  return key.slice(this.prefix.length)
 }
 
-Namespace.prototype.contains = function (key) {
-  return compare(this.prefix, key.slice(0, this.prefix.length)) === 0
+Namespace.prototype.encode = function (key, options) {
+  return Buffer.concat([ this.prefix, key ])
 }
 
 function space(db, ns, options) {
@@ -55,7 +56,7 @@ function space(db, ns, options) {
   //
   // encode as binary but preserve original (defaults to "utf8" per levelup API)
   //
-  ns.keyEncoding = options.keyEncoding || 'utf8'
+  ns.options = xtend(options)
   options.keyEncoding = 'binary'
 
   function factory() {
@@ -85,16 +86,16 @@ function space(db, ns, options) {
 }
 
 
-function prePut(key, value, options, callback, next) {
-  next(this.encode(key, options), value, options, callback)
+function prePut(key, value, options, cb, next) {
+  next(this.encode(key, options), value, options, cb)
 }
 
 
-function preDel(key, options, callback, next) {
-  next(this.encode(key, options), options, callback)
+function preDel(key, options, cb, next) {
+  next(this.encode(key, options), options, cb)
 }
 
-function preBatch(array, options, callback, next) {
+function preBatch(array, options, cb, next) {
   var narray = array
 
   if (Array.isArray(array)) {
@@ -105,22 +106,27 @@ function preBatch(array, options, callback, next) {
     }
   }
 
-  next(narray, options, callback)
+  next(narray, options, cb)
 }
 
 
-function preGet(key, options, callback, next) {
-  next(this.encode(key, options), options, callback)
+function preGet(key, options, cb, next) {
+  next(this.encode(key, options), options, cb)
 }
 
 
-function postGet(key, options, err, value, callback, next) {
-  next(this.decode(key, options), options, err, value, callback)
+function postGet(key, options, err, value, cb, next) {
+  next(this.decode(key, options), options, err, value, cb)
 }
 
 
-var LOWER_BOUND = bytewise.encode(bytewise.bound.lower())
-var UPPER_BOUND = bytewise.encode(bytewise.bound.upper())
+function postNext(options, err, key, value, cb, next) {
+  next(err, (err || key == null) ? key : this.decode(key, options), value, cb)
+}
+
+
+var LOWER_BOUND = new Buffer([])
+var UPPER_BOUND = new Buffer([ 0xff ])
 var rangeKeys = [ 'start', 'end', 'gt', 'lt', 'gte', 'lte' ]
 
 function preIterator(pre) {
@@ -172,7 +178,7 @@ function preIterator(pre) {
     options.lt = this.encode(UPPER_BOUND, options)
   }
 
-  var $postNext = postNext.bind(this)
+  var $postNext = postNext.bind(this, options)
 
   function wrappedFactory(options) {
     var iterator = pre.factory(options)
@@ -188,11 +194,6 @@ function preIterator(pre) {
     options: options,
     factory: wrappedFactory
   }
-}
-
-
-function postNext(err, key, value, callback, next) {
-  next(err, (err || key == null) ? key : this.decode(key), value, callback)
 }
 
 
