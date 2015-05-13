@@ -4,7 +4,7 @@
   "description": "Efficient keypath subspaces with bytewise tuples",
   "main": "index.js",
   "scripts": {
-    "test": "node test | faucet"
+    "test": "tape test | faucet"
   },
   "repository": {
     "type": "git",
@@ -23,7 +23,7 @@
   },
   "homepage": "https://github.com/deanlandolt/bytewise-space",
   "dependencies": {
-    "bytewise-core": "^1.0.0",
+    "bytewise-core": "^1.1",
     "level-updown": "^2.0.1",
     "levelup": "^1.0.0-5",
     "xtend": "^4.0.0"

@@ -45,7 +45,7 @@ function space(db, namespace, options) {
   options || (options = {})
 
   //
-  // encode as binary but preserve original (defaulting to "utf8" like levelup)
+  // encode as binary but preserve original (defaulting to "utf8" per levelup)
   //
   var keyEncoding = options.keyEncoding || 'utf8'
   options.keyEncoding = 'binary'
@@ -55,7 +55,7 @@ function space(db, namespace, options) {
   }
 
   function decode(key, options) {
-    // TODO: figure out why updown even sends bounds keys
+    // TODO: figure out why updown even sends out of bounds keys
     if (key.toString('hex').slice(4).indexOf(namespace.prefix) !== 0)
       return key
 
@@ -133,6 +133,9 @@ function mkPreBatch(encode) {
   }
 }
 
+var LOWER_BOUND = bytewise.bound.lower()
+var UPPER_BOUND = bytewise.bound.upper()
+
 function mkPreIterator(encode, decode) {
   return function preIterator(pre) {
     var options = xtend(pre.options)
@@ -143,12 +146,12 @@ function mkPreIterator(encode, decode) {
       }
       else {
         if (!options.reverse) {
-          options.gte = 'start' in options ? options.start : null
-          options.lte = 'end' in options ? options.end : undefined
+          options.gte = 'start' in options ? options.start : LOWER_BOUND
+          options.lte = 'end' in options ? options.end : UPPER_BOUND
         }
         else {
-          options.gte = 'end' in options ? options.end : null
-          options.lte = 'start' in options ? options.start : undefined
+          options.gte = 'end' in options ? options.end : LOWER_BOUND
+          options.lte = 'start' in options ? options.start : UPPER_BOUND
         }
         delete options.start
         delete options.end
@@ -163,8 +166,7 @@ function mkPreIterator(encode, decode) {
       options.gte = encode(options.gte, options)
     }
     else {
-      // TODO .gt = encode(base.bound.lower, options)
-      options.gte = encode(null, options)
+      options.gt = encode(LOWER_BOUND, options)
     }
 
     if ('lt' in options) {
@@ -174,8 +176,7 @@ function mkPreIterator(encode, decode) {
     else if ('lte' in options)
       options.lte = encode(options.lte, options)
     else {
-      // TODO: .lt = encode(base.bound.upper, options)
-      options.lte = encode(undefined, options)
+      options.lt = encode(UPPER_BOUND, options)
     }
 
     function wrappedFactory(options) {
