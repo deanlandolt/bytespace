@@ -1,45 +1,51 @@
 var bytewise = require('bytewise-core')
+var compare = require('bytewise-core/util').compare
 var levelup = require('levelup')
 var updown = require('level-updown')
 var xtend = require('xtend')
 
+var arrayBoundary = bytewise.sorts.array.bound
+
 //
-// brand namespace to keep track of root
+// brand namespace to keep track of subspace root
 //
-function Namespace(data) {
-  // TODO: encode as length-prefixed array, cheating with nested arrays for now
-  this.data = data
-  this.encoded = bytewise.encode(data)
-  this.prefix = this.encoded.slice(1, this.encoded.length - 1).toString('hex')
+function Namespace(path) {
+  this.path = path
+  this.prefix = bytewise.encode(arrayBoundary.lower([ path ]))
 }
 
 Namespace.prototype.append = function (sub) {
-  return new Namespace(this.data.concat(sub))
+  return new Namespace(this.path.concat(sub))
 }
 
 Namespace.prototype.encode = function (key, options) {
-  // TODO: respect `options.keyEncoding`, optimize bw keys avoiding extra encode
-  return bytewise.encode([ this.data, key ])
+  // TODO: respect `options.keyEncoding`, optimize on bw keys to avoid double-encode
+  return bytewise.encode([ this.path, key ])
 }
 
 Namespace.prototype.decode = function (key, options) {
   // TODO: slice off namespace portion before decoding
-  return bytewise.decode(key)[1]
+  // e.g. bytewise.decode(key.slice(this.prefix.length, -2), { nested: true })
+  return this.contains(key) ? bytewise.decode(key)[1] : key
 }
 
-function space(db, namespace, options) {
-  if (!(namespace instanceof Namespace)) {
+Namespace.prototype.contains = function (key) {
+  return compare(this.prefix, key.slice(0, this.prefix.length)) === 0
+}
+
+function space(db, ns, options) {
+  if (!(ns instanceof Namespace)) {
     //
     // if db is a subspace mount as a nested subspace
     //
-    if (typeof db.mountSubspace === 'function') {
-      return db.mountSubspace(namespace, options)
+    if (typeof db.subspace === 'function') {
+      return db.subspace(ns, options)
     }
     
     //
-    // otherwise this is a root subspace
+    // otherwise this is a top level subspace
     //
-    namespace = new Namespace([ namespace ])
+    ns = new Namespace([ ns ])
   }
 
   options || (options = {})
@@ -50,42 +56,33 @@ function space(db, namespace, options) {
   var keyEncoding = options.keyEncoding || 'utf8'
   options.keyEncoding = 'binary'
 
-  function encode(key, options) {
-    return namespace.encode(key, options)
-  }
-
-  function decode(key, options) {
-    // TODO: figure out why updown even sends out of bounds keys
-    if (key.toString('hex').slice(4).indexOf(namespace.prefix) !== 0)
-      return key
-
-    return namespace.decode(key, options)
-  }
+  var encode = ns.encode.bind(ns)
+  var decode = ns.decode.bind(ns)
 
   function factory() {
-    var ud = updown(db)
+    var base = updown(db)
 
-    ud.extendWith({
+    base.extendWith({
       prePut: mkPrePut(encode),
       preGet: mkPreGet(encode),
-      postGet: mkPostGet(decode),
       preDel: mkPreDel(encode),
       preBatch: mkPreBatch(encode),
+      postGet: mkPostGet(decode),
       preIterator: mkPreIterator(encode, decode)
     })
 
-    return ud
+    return base
   }
 
   options.db = factory
 
-  var subspace = levelup(options)
+  var sub = levelup(options)
 
-  subspace.mountSubspace = function (sub, options) {
-    return space(db, namespace.append(sub), options)
+  sub.subspace = function (subNs, options) {
+    return space(db, ns.append(subNs), options)
   }
 
-  return subspace
+  return sub
 }
 
 
@@ -103,13 +100,6 @@ function mkPreGet(encode) {
 }
 
 
-function mkPostGet(decode) {
-  return function postGet(key, options, err, value, callback, next) {
-    next(decode(key, options), options, err, value, callback)
-  }
-}
-
-
 function mkPreDel(encode) {
   return function preDel(key, options, callback, next) {
     next(encode(key, options), options, callback)
@@ -123,7 +113,7 @@ function mkPreBatch(encode) {
 
     if (Array.isArray(array)) {
       narray = []
-      for (var i = 0; i < array.length; i++) {
+      for (var i = 0, length = array.length; i < length; i++) {
         narray[i] = xtend(array[i])
         narray[i].key = encode(narray[i].key, options)
       }
@@ -133,47 +123,63 @@ function mkPreBatch(encode) {
   }
 }
 
-var LOWER_BOUND = bytewise.bound.lower()
-var UPPER_BOUND = bytewise.bound.upper()
+
+function mkPostGet(decode) {
+  return function postGet(key, options, err, value, callback, next) {
+    next(decode(key, options), options, err, value, callback)
+  }
+}
+
+
+var LOWER_BOUND = bytewise.encode(bytewise.bound.lower())
+var UPPER_BOUND = bytewise.encode(bytewise.bound.upper())
+var rangeKeys = [ 'start', 'end', 'gt', 'lt', 'gte', 'lte' ]
 
 function mkPreIterator(encode, decode) {
   return function preIterator(pre) {
     var options = xtend(pre.options)
 
-    if ('start' in options || 'end' in options) {
-      if ('lte' in options || 'lt' in options || 'gte' in options || 'gt' in options) {
+    var has = {}
+    rangeKeys.forEach(function (key) {
+      has[key] = key in options
+    })
+
+    if (has.start || has.end) {
+      if (has.gt || has.lt || has.gte || has.lte) {
         // TODO: updown sending phantom start value -- bug?
       }
       else {
         if (!options.reverse) {
-          options.gte = 'start' in options ? options.start : LOWER_BOUND
-          options.lte = 'end' in options ? options.end : UPPER_BOUND
+          options.gte = has.start ? options.start : LOWER_BOUND
+          options.lte = has.end ? options.end : UPPER_BOUND
         }
         else {
-          options.gte = 'end' in options ? options.end : LOWER_BOUND
-          options.lte = 'start' in options ? options.start : UPPER_BOUND
+          options.gte = has.end ? options.end : LOWER_BOUND
+          options.lte = has.start ? options.start : UPPER_BOUND
         }
+
+        has.gte = has.lte = true
         delete options.start
         delete options.end
       }
     }
 
-    if ('gt' in options) {
+    if (has.gt) {
       options.gt = encode(options.gt, options)
       delete options.gte
     }
-    else if ('gte' in options) {
+    else if (has.gte) {
       options.gte = encode(options.gte, options)
     }
     else {
       options.gt = encode(LOWER_BOUND, options)
     }
 
-    if ('lt' in options) {
+    if (has.lt) {
       options.lt = encode(options.lt, options)
       delete options.lte
     }
-    else if ('lte' in options)
+    else if (has.lte)
       options.lte = encode(options.lte, options)
     else {
       options.lt = encode(UPPER_BOUND, options)
