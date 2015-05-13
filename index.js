@@ -24,9 +24,11 @@ Namespace.prototype.encode = function (key, options) {
 }
 
 Namespace.prototype.decode = function (key, options) {
-  // TODO: slice off namespace portion before decoding
-  // e.g. bytewise.decode(key.slice(this.prefix.length, -2), { nested: true })
-  return this.contains(key) ? bytewise.decode(key)[1] : key
+  //
+  // slice off namespace portion before decoding
+  //
+  var buffer = key.slice(this.prefix.length, -2)
+  return this.contains(key) ? bytewise.decode(buffer, { nested: true }) : key
 }
 
 Namespace.prototype.contains = function (key) {
