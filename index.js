@@ -51,24 +51,21 @@ function space(db, ns, options) {
   options || (options = {})
 
   //
-  // encode as binary but preserve original (defaulting to "utf8" per levelup)
+  // encode as binary but preserve original (defaults to "utf8" per levelup API)
   //
-  var keyEncoding = options.keyEncoding || 'utf8'
+  ns.keyEncoding = options.keyEncoding || 'utf8'
   options.keyEncoding = 'binary'
-
-  var encode = ns.encode.bind(ns)
-  var decode = ns.decode.bind(ns)
 
   function factory() {
     var base = updown(db)
 
     base.extendWith({
-      prePut: mkPrePut(encode),
-      preGet: mkPreGet(encode),
-      preDel: mkPreDel(encode),
-      preBatch: mkPreBatch(encode),
-      postGet: mkPostGet(decode),
-      preIterator: mkPreIterator(encode, decode)
+      prePut: prePut.bind(ns),
+      preDel: preDel.bind(ns),
+      preBatch: preBatch.bind(ns),
+      preGet: preGet.bind(ns),
+      postGet: postGet.bind(ns),
+      preIterator: preIterator.bind(ns)
     })
 
     return base
@@ -86,48 +83,37 @@ function space(db, ns, options) {
 }
 
 
-function mkPrePut(encode) {
-  return function prePut(key, value, options, callback, next) {
-    next(encode(key, options), value, options, callback)
-  }
+function prePut(key, value, options, callback, next) {
+  next(this.encode(key, options), value, options, callback)
 }
 
 
-function mkPreGet(encode) {
-  return function preGet(key, options, callback, next) {
-    next(encode(key, options), options, callback)
-  }
+function preDel(key, options, callback, next) {
+  next(this.encode(key, options), options, callback)
 }
 
+function preBatch(array, options, callback, next) {
+  var narray = array
 
-function mkPreDel(encode) {
-  return function preDel(key, options, callback, next) {
-    next(encode(key, options), options, callback)
-  }
-}
-
-
-function mkPreBatch(encode) {
-  return function preBatch(array, options, callback, next) {
-    var narray = array
-
-    if (Array.isArray(array)) {
-      narray = []
-      for (var i = 0, length = array.length; i < length; i++) {
-        narray[i] = xtend(array[i])
-        narray[i].key = encode(narray[i].key, options)
-      }
+  if (Array.isArray(array)) {
+    narray = []
+    for (var i = 0, length = array.length; i < length; i++) {
+      narray[i] = xtend(array[i])
+      narray[i].key = this.encode(narray[i].key, options)
     }
-
-    next(narray, options, callback)
   }
+
+  next(narray, options, callback)
 }
 
 
-function mkPostGet(decode) {
-  return function postGet(key, options, err, value, callback, next) {
-    next(decode(key, options), options, err, value, callback)
-  }
+function preGet(key, options, callback, next) {
+  next(this.encode(key, options), options, callback)
+}
+
+
+function postGet(key, options, err, value, callback, next) {
+  next(this.decode(key, options), options, err, value, callback)
 }
 
 
@@ -135,79 +121,78 @@ var LOWER_BOUND = bytewise.encode(bytewise.bound.lower())
 var UPPER_BOUND = bytewise.encode(bytewise.bound.upper())
 var rangeKeys = [ 'start', 'end', 'gt', 'lt', 'gte', 'lte' ]
 
-function mkPreIterator(encode, decode) {
-  return function preIterator(pre) {
-    var options = xtend(pre.options)
+function preIterator(pre) {
+  var options = xtend(pre.options)
 
-    var has = {}
-    rangeKeys.forEach(function (key) {
-      has[key] = key in options
-    })
+  var has = {}
+  rangeKeys.forEach(function (key) {
+    has[key] = key in options
+  })
 
-    if (has.start || has.end) {
-      if (has.gt || has.lt || has.gte || has.lte) {
-        // TODO: updown sending phantom start value -- bug?
+  if (has.start || has.end) {
+    if (has.gt || has.lt || has.gte || has.lte) {
+      // TODO: updown sending phantom start value -- bug?
+    }
+    else {
+      if (!options.reverse) {
+        options.gte = has.start ? options.start : LOWER_BOUND
+        options.lte = has.end ? options.end : UPPER_BOUND
       }
       else {
-        if (!options.reverse) {
-          options.gte = has.start ? options.start : LOWER_BOUND
-          options.lte = has.end ? options.end : UPPER_BOUND
-        }
-        else {
-          options.gte = has.end ? options.end : LOWER_BOUND
-          options.lte = has.start ? options.start : UPPER_BOUND
-        }
-
-        has.gte = has.lte = true
-        delete options.start
-        delete options.end
+        options.gte = has.end ? options.end : LOWER_BOUND
+        options.lte = has.start ? options.start : UPPER_BOUND
       }
-    }
 
-    if (has.gt) {
-      options.gt = encode(options.gt, options)
-      delete options.gte
+      has.gte = has.lte = true
+      delete options.start
+      delete options.end
     }
-    else if (has.gte) {
-      options.gte = encode(options.gte, options)
-    }
-    else {
-      options.gt = encode(LOWER_BOUND, options)
-    }
+  }
 
-    if (has.lt) {
-      options.lt = encode(options.lt, options)
-      delete options.lte
-    }
-    else if (has.lte)
-      options.lte = encode(options.lte, options)
-    else {
-      options.lt = encode(UPPER_BOUND, options)
-    }
+  if (has.gt) {
+    options.gt = this.encode(options.gt, options)
+    delete options.gte
+  }
+  else if (has.gte) {
+    options.gte = this.encode(options.gte, options)
+  }
+  else {
+    options.gt = this.encode(LOWER_BOUND, options)
+  }
 
-    function wrappedFactory(options) {
-      var iterator = pre.factory(options)
+  if (has.lt) {
+    options.lt = this.encode(options.lt, options)
+    delete options.lte
+  }
+  else if (has.lte)
+    options.lte = this.encode(options.lte, options)
+  else {
+    options.lt = this.encode(UPPER_BOUND, options)
+  }
 
-      iterator.extendWith({
-          postNext: mkPreNext(decode)
-      })
+  var $postNext = postNext.bind(this)
 
-      return iterator
-    }
+  function wrappedFactory(options) {
+    var iterator = pre.factory(options)
 
-    return {
-      options: options,
-      factory: wrappedFactory
-    }
+    iterator.extendWith({
+      postNext: $postNext
+    })
+
+    return iterator
+  }
+
+  return {
+    options: options,
+    factory: wrappedFactory
   }
 }
 
 
-function mkPreNext(decode) {
-  return function preNext(err, key, value, callback, next) {
-    next(err, (err || key == null) ? key : decode(key), value, callback)
-  }
+function postNext(err, key, value, callback, next) {
+  next(err, (err || key == null) ? key : this.decode(key), value, callback)
 }
+
 
 //
 // add ref to bytewise as a convenience

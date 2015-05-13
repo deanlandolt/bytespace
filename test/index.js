@@ -641,6 +641,7 @@ function readStreamTest(options) {
         t.ifError(err, 'no error')
         rimraf.sync(testDb)
         rimraf.sync(testDb + '.ref')
+        rimraf.sync(testDb + '.ref2')
         t.end()
       })
 
