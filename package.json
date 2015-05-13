@@ -1,6 +1,6 @@
 {
   "name": "bytewise-space",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Efficient keypath subspaces with bytewise tuples",
   "main": "index.js",
   "scripts": {
@@ -23,7 +23,7 @@
   },
   "homepage": "https://github.com/deanlandolt/bytewise-space",
   "dependencies": {
-    "bytewise-core": "^1.1",
+    "bytewise-core": "^1.2",
     "level-updown": "^2.0.1",
     "levelup": "^1.0.0-5",
     "xtend": "^4.0.0"
