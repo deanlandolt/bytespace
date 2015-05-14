@@ -1,5 +1,6 @@
 var assert = require('assert')
 var bytewise = require('bytewise-core')
+var domain = require('domain')
 var equal = require('bytewise-core/util').equal
 var levelup = require('levelup')
 var updown = require('level-updown')
@@ -63,8 +64,12 @@ function bytespace(db, namespace, options) {
 
   options || (options = {})
 
+  prefix.precommit = options.precommit
+  prefix.postcommit = options.postcommit
+
   function factory() {
     var base = updown(db)
+    prefix.batch = base._batch.bind(base)
 
     base.extendWith({
       prePut: prePut.bind(prefix),
@@ -86,35 +91,106 @@ function bytespace(db, namespace, options) {
     return bytespace(db, prefix.append(namespace), options)
   }
 
+  space.clone = function (namespace, options) {
+    return bytespace(db, prefix, options)
+  }
+
   return space
 }
 
 
 function prePut(key, value, options, cb, next) {
-  options.keyEncoding = 'binary'
-  next(this.encode(key), value, options, cb)
+  var ops = [{ type: 'put', key: key, value: value }]
+
+  //
+  // only run hooks if we aren't currently within a transaction context
+  //
+  var tx = domain.active
+  var unscoped = !tx
+  if (unscoped) {
+    tx = domain.create()
+    tx.on('error', function (err) {
+      tx.abort || (tx.abort = err)
+    })
+  }
+
+  var prefix = this
+  tx.run(function () {
+    ops = (unscoped && prefix.precommit) ? prefix.precommit(ops) : ops
+
+    prefix.batch(ops, options, function (err) {
+      unscoped && tx.exit()
+      cb(err)
+    })
+  })
 }
 
 
 function preDel(key, options, cb, next) {
-  options.keyEncoding = 'binary'
-  next(this.encode(key), options, cb)
+  var ops = [{ type: 'del', key: key, value: null }]
+
+  //
+  // only run hooks if we aren't currently within a transaction context
+  //
+  var tx = domain.active
+  var unscoped = !tx
+  if (unscoped) {
+    tx = domain.create()
+    tx.on('error', function (err) {
+      tx.abort || (tx.abort = err)
+    })
+  }
+
+  var prefix = this
+  tx.run(function () {
+    ops = (unscoped && prefix.precommit) ? prefix.precommit(ops) : ops
+
+    prefix.batch(ops, options, function (err) {
+      unscoped && tx.exit()
+      cb(err)
+    })
+  })
 }
 
 
-function preBatch(array, options, cb, next) {
-  options.keyEncoding = 'binary'
-  var narray = array
-
-  if (Array.isArray(array)) {
-    narray = []
-    for (var i = 0, length = array.length; i < length; i++) {
-      narray[i] = xtend(array[i])
-      narray[i].key = this.encode(narray[i].key)
-    }
+function preBatch(ops, options, cb, next) {
+  //
+  // only run hooks if we aren't currently within a transaction context
+  //
+  var tx = domain.active
+  var unscoped = !tx
+  if (unscoped) {
+    tx = domain.create()
+    tx.on('error', function (err) {
+      tx.abort || (tx.abort = err)
+    })
   }
 
-  next(narray, options, cb)
+  var prefix = this
+  tx.run(function () {
+    ops = (unscoped && prefix.precommit) ? prefix.precommit(ops) : ops
+    if (tx.abort) {
+      tx.exit()
+      return cb(tx.abort)
+    }
+
+    options.keyEncoding = 'binary'
+    var array = ops
+    var op
+
+    if (Array.isArray(ops)) {
+      array = []
+      for (var i = 0, length = ops.length; i < length; i++) {
+        op = array[i] = xtend(ops[i])
+        op.key = prefix.encode(op.key)
+      }
+    }
+
+    next(array, options, function (err) {
+      unscoped && tx.exit()
+      cb(err)
+    })
+  })
 }
 
 

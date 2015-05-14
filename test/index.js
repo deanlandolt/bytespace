@@ -7,6 +7,7 @@ var inspect = require('util').inspect
 var rimraf = require('rimraf')
 var subspace = require('../')
 var test = require('tape')
+var xtend = require('xtend')
 
 var bytewise = subspace.bytewise
 var testDb  = __dirname + '/__bytespace.db'
@@ -844,3 +845,74 @@ readStreamTest({ gt: 'key50', reverse: true, limit: 40 })
 readStreamTest({ gte: 'key50', reverse: true, limit: 40 })
 readStreamTest({ lt: 'key50', reverse: true, limit: 40 })
 readStreamTest({ lte: 'key50', reverse: true, limit: 40 })
+
+
+test('precommit hooks', dbWrap(function (t, base) {
+
+  var calls = [ 0, 0 ]
+  var dbs = [
+    base,
+    subspace(base, 'test space 1', {
+      precommit: function (ops) {
+        calls[0]++
+        ops.forEach(function (op) {
+          op.key = op.key.toUpperCase()
+        })
+        return ops
+      }
+    }),
+    subspace(base, 'test space 2', {
+      // valueEncoding: 'json',
+      precommit: function (ops) {
+        calls[1]++
+        ops.forEach(function (op) {
+          op = xtend(op)
+          op.key += ' xxx'
+          ops.push(op)
+        })
+        return ops
+      }
+    })
+  ]
+  var done = after(dbs.length * 2, afterPut)
+
+  function afterPut (err) {
+    t.ifError(err, 'no error')
+    t.deepEqual(calls, [ 2, 2 ])
+
+    var done = after(dbs.length, verify)
+
+    dbs.forEach(function (db, i) {
+      db.batch([
+        { type: 'put', key: 'boom' + i, value: 'bang' + i },
+        { type: 'del', key: 'bar' + i },
+        { type: 'put', key: 'bang' + i, value: 'boom' + i },
+      ], done)
+    })
+  }
+
+  function verify (err) {
+    t.ifError(err, 'no error')
+
+    t.dbEquals([
+      [ hex('bang0'), 'boom0' ],
+      [ hex('boom0'), 'bang0' ],
+      [ hex('foo0'), 'bar0' ],
+      [ nsHex([ 'test space 1' ], 'BANG1'), 'boom1' ],
+      [ nsHex([ 'test space 1' ], 'BOOM1'), 'bang1' ],
+      [ nsHex([ 'test space 1' ], 'FOO1'), 'bar1' ],
+      [ nsHex([ 'test space 2' ], 'bang2'), 'boom2' ],
+      [ nsHex([ 'test space 2' ], 'bang2 xxx'), 'boom2' ],
+      [ nsHex([ 'test space 2' ], 'boom2'), 'bang2' ],
+      [ nsHex([ 'test space 2' ], 'boom2 xxx'), 'bang2' ],
+      [ nsHex([ 'test space 2' ], 'foo2'), 'bar2' ],
+      [ nsHex([ 'test space 2' ], 'foo2 xxx'), 'bar2' ],
+    ], t.end)
+  }
+
+  dbs.forEach(function (db, i) {
+    db.put('foo' + i, 'bar' + i, done)
+    db.put('bar' + i, 'foo' + i, done)
+  })
+
+}))
