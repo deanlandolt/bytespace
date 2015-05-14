@@ -5,11 +5,11 @@ var levelup = require('levelup')
 var list = require('list-stream')
 var inspect = require('util').inspect
 var rimraf = require('rimraf')
-var space = require('../')
+var subspace = require('../')
 var test = require('tape')
 
-var bytewise = space.bytewise
-var testDb  = __dirname + '/__test.db'
+var bytewise = subspace.bytewise
+var testDb  = __dirname + '/__bytespace.db'
 
 
 function readStreamToList (readStream, cb) {
@@ -25,9 +25,9 @@ function readStreamToList (readStream, cb) {
   }))
 }
 
-function dbEquals (ldb, t) {
+function dbEquals (base, t) {
   return function (expected, cb) {
-    readStreamToList(ldb.createReadStream({
+    readStreamToList(base.createReadStream({
       keyEncoding: 'hex'
     }), function (err, data) {
       t.ifError(err, 'no error')
@@ -40,7 +40,7 @@ function dbEquals (ldb, t) {
 function dbWrap (testFn) {
   return function (t) {
     rimraf.sync(testDb)
-    levelup(testDb, function (err, ldb) {
+    levelup(testDb, function (err, base) {
       t.ifError(err, 'no error')
 
       t.$end = t.end
@@ -48,15 +48,15 @@ function dbWrap (testFn) {
         if (err !== undefined)
           t.ifError(err, 'no error')
 
-        ldb.close(function (err) {
+        base.close(function (err) {
           t.ifError(err, 'no error')
           rimraf.sync(testDb)
           t.$end()
         })
       }
-      t.dbEquals = dbEquals(ldb, t)
+      t.dbEquals = dbEquals(base, t)
 
-      testFn(t, ldb)
+      testFn(t, base)
     })
   }
 }
@@ -77,11 +77,11 @@ function nsKey(ns, key) {
 }
 
 
-test('test puts', dbWrap(function (t, ldb) {
+test('test puts', dbWrap(function (t, base) {
   var dbs = [
-    ldb,
-    space(ldb, 'test space 1'),
-    space(ldb, 'test space 2'),
+    base,
+    subspace(base, 'test space 1'),
+    subspace(base, 'test space 2'),
   ]
   var done = after(dbs.length * 2, verify)
 
@@ -105,13 +105,13 @@ test('test puts', dbWrap(function (t, ldb) {
 }))
 
 
-test('test puts @ multiple levels', dbWrap(function (t, ldb) {
-  var sdb1 = space(ldb, 'test space 1')
-  var sdb2 = space(ldb, 'test space 2')
-  var sdb11 = space(sdb1, 'inner space 1')
-  var sdb12 = space(sdb1, 'inner space 2')
-  var sdb21 = space(sdb2, 'inner space 1')
-  var dbs = [ ldb, sdb1, sdb2, sdb11, sdb12, sdb21 ]
+test('test puts @ multiple levels', dbWrap(function (t, base) {
+  var sdb1 = subspace(base, 'test space 1')
+  var sdb2 = subspace(base, 'test space 2')
+  var sdb11 = subspace(sdb1, 'inner space 1')
+  var sdb12 = subspace(sdb1, 'inner space 2')
+  var sdb21 = subspace(sdb2, 'inner space 1')
+  var dbs = [ base, sdb1, sdb2, sdb11, sdb12, sdb21 ]
   var done = after(dbs.length * 2, verify)
 
   function verify (err) {
@@ -140,11 +140,11 @@ test('test puts @ multiple levels', dbWrap(function (t, ldb) {
 }))
 
 
-test('test gets', dbWrap(function (t, ldb) {
+test('test gets', dbWrap(function (t, base) {
   var dbs = [
-    ldb,
-    space(ldb, 'test space 1'),
-    space(ldb, 'test space 2'),
+    base,
+    subspace(base, 'test space 1'),
+    subspace(base, 'test space 2'),
   ]
   var done = after(dbs.length * 2, verify)
 
@@ -174,13 +174,13 @@ test('test gets', dbWrap(function (t, ldb) {
 }))
 
 
-test('test gets @ multiple levels', dbWrap(function (t, ldb) {
-  var sdb1 = space(ldb, 'test space 1')
-  var sdb2 = space(ldb, 'test space 2')
-  var sdb11 = space(sdb1, 'inner space 1')
-  var sdb12 = space(sdb1, 'inner space 2')
-  var sdb21 = space(sdb2, 'inner space 1')
-  var dbs = [ ldb, sdb1, sdb2, sdb11, sdb12, sdb21 ]
+test('test gets @ multiple levels', dbWrap(function (t, base) {
+  var sdb1 = subspace(base, 'test space 1')
+  var sdb2 = subspace(base, 'test space 2')
+  var sdb11 = subspace(sdb1, 'inner space 1')
+  var sdb12 = subspace(sdb1, 'inner space 2')
+  var sdb21 = subspace(sdb2, 'inner space 1')
+  var dbs = [ base, sdb1, sdb2, sdb11, sdb12, sdb21 ]
   var done = after(dbs.length * 2, verify)
 
   function verify (err) {
@@ -209,11 +209,11 @@ test('test gets @ multiple levels', dbWrap(function (t, ldb) {
 }))
 
 
-test('test dels', dbWrap(function (t, ldb) {
+test('test dels', dbWrap(function (t, base) {
   var dbs = [
-    ldb,
-    space(ldb, 'test space 1'),
-    space(ldb, 'test space 2'),
+    base,
+    subspace(base, 'test space 1'),
+    subspace(base, 'test space 2'),
   ]
   done = after(dbs.length * 2, afterPut)
 
@@ -248,13 +248,13 @@ test('test dels', dbWrap(function (t, ldb) {
 }))
 
 
-test('test dels @ multiple levels', dbWrap(function (t, ldb) {
-  var sdb1 = space(ldb, 'test space 1')
-  var sdb2 = space(ldb, 'test space 2')
-  var sdb11 = space(sdb1, 'inner space 1')
-  var sdb12 = space(sdb1, 'inner space 2')
-  var sdb21 = space(sdb2, 'inner space 1')
-  var dbs = [ ldb, sdb1, sdb2, sdb11, sdb12, sdb21 ]
+test('test dels @ multiple levels', dbWrap(function (t, base) {
+  var sdb1 = subspace(base, 'test space 1')
+  var sdb2 = subspace(base, 'test space 2')
+  var sdb11 = subspace(sdb1, 'inner space 1')
+  var sdb12 = subspace(sdb1, 'inner space 2')
+  var sdb21 = subspace(sdb2, 'inner space 1')
+  var dbs = [ base, sdb1, sdb2, sdb11, sdb12, sdb21 ]
   var done = after(dbs.length * 2, afterPut)
 
   function afterPut (err) {
@@ -291,11 +291,11 @@ test('test dels @ multiple levels', dbWrap(function (t, ldb) {
 }))
 
 
-test('test batch', dbWrap(function (t, ldb) {
+test('test batch', dbWrap(function (t, base) {
   var dbs = [
-    ldb,
-    space(ldb, 'test space 1'),
-    space(ldb, 'test space 2'),
+    base,
+    subspace(base, 'test space 1'),
+    subspace(base, 'test space 2'),
   ]
   var done = after(dbs.length * 2, afterPut)
 
@@ -340,13 +340,13 @@ test('test batch', dbWrap(function (t, ldb) {
 }))
 
 
-test('test batch @ multiple levels', dbWrap(function (t, ldb) {
-  var sdb1 = space(ldb, 'test space 1')
-  var sdb2 = space(ldb, 'test space 2')
-  var sdb11 = space(sdb1, 'inner space 1')
-  var sdb12 = space(sdb1, 'inner space 2')
-  var sdb21 = space(sdb2, 'inner space 1')
-  var dbs = [ ldb, sdb1, sdb2, sdb11, sdb12, sdb21 ]
+test('test batch @ multiple levels', dbWrap(function (t, base) {
+  var sdb1 = subspace(base, 'test space 1')
+  var sdb2 = subspace(base, 'test space 2')
+  var sdb11 = subspace(sdb1, 'inner space 1')
+  var sdb12 = subspace(sdb1, 'inner space 2')
+  var sdb21 = subspace(sdb2, 'inner space 1')
+  var dbs = [ base, sdb1, sdb2, sdb11, sdb12, sdb21 ]
   var done = after(dbs.length * 2, afterPut)
 
   function afterPut (err) {
@@ -399,11 +399,11 @@ test('test batch @ multiple levels', dbWrap(function (t, ldb) {
 }))
 
 
-test('test chained batch', dbWrap(function (t, ldb) {
+test('test chained batch', dbWrap(function (t, base) {
   var dbs = [
-    ldb,
-    space(ldb, 'test space 1'),
-    space(ldb, 'test space 2'),
+    base,
+    subspace(base, 'test space 1'),
+    subspace(base, 'test space 2'),
   ]
   var done = after(dbs.length * 2, afterPut)
 
@@ -448,13 +448,13 @@ test('test chained batch', dbWrap(function (t, ldb) {
 }))
 
 
-test('test batch @ multiple levels', dbWrap(function (t, ldb) {
-  var sdb1 = space(ldb, 'test space 1')
-  var sdb2 = space(ldb, 'test space 2')
-  var sdb11 = space(sdb1, 'inner space 1')
-  var sdb12 = space(sdb1, 'inner space 2')
-  var sdb21 = space(sdb2, 'inner space 1')
-  var dbs = [ ldb, sdb1, sdb2, sdb11, sdb12, sdb21 ]
+test('test batch @ multiple levels', dbWrap(function (t, base) {
+  var sdb1 = subspace(base, 'test space 1')
+  var sdb2 = subspace(base, 'test space 2')
+  var sdb11 = subspace(sdb1, 'inner space 1')
+  var sdb12 = subspace(sdb1, 'inner space 2')
+  var sdb21 = subspace(sdb2, 'inner space 1')
+  var dbs = [ base, sdb1, sdb2, sdb11, sdb12, sdb21 ]
   var done = after(dbs.length * 2, afterPut)
 
   function afterPut (err) {
@@ -507,10 +507,10 @@ test('test batch @ multiple levels', dbWrap(function (t, ldb) {
 }))
 
 
-test('explicit json valueEncoding', dbWrap(function (t, ldb) {
+test('explicit json valueEncoding', dbWrap(function (t, base) {
   var thing = { one: 'two', three: 'four' }
   var opt = { valueEncoding: 'json'}
-  var jsonDb = space(ldb, 'json-things', opt)
+  var jsonDb = subspace(base, 'json-things', opt)
 
   jsonDb.put('thing', thing, opt, function (err) {
     t.ifError(err, 'no error')
@@ -526,14 +526,14 @@ test('explicit json valueEncoding', dbWrap(function (t, ldb) {
 }))
 
 
-test('explicit json on db valueEncoding raw entry', dbWrap(function (t, ldb) {
-  var sdb = space(ldb, 'json-things', { valueEncoding: 'json' })
+test('explicit json on db valueEncoding raw entry', dbWrap(function (t, base) {
+  var sdb = subspace(base, 'json-things', { valueEncoding: 'json' })
   var thing = { one: 'two', three: 'four' }
 
   sdb.put('thing', thing, function (err) {
     t.error(err)
 
-    ldb.get(nsKey([ 'json-things' ], 'thing'), {
+    base.get(nsKey([ 'json-things' ], 'thing'), {
       valueEncoding: 'utf8'
     }, function (err, value) {
       t.error(err)
@@ -545,8 +545,8 @@ test('explicit json on db valueEncoding raw entry', dbWrap(function (t, ldb) {
 }))
 
 
-test('explicit json on put valueEncoding raw entry', dbWrap(function (t, ldb) {
-  var sdb = space(ldb, 'json-things')
+test('explicit json on put valueEncoding raw entry', dbWrap(function (t, base) {
+  var sdb = subspace(base, 'json-things')
   var thing = { one: 'two', three: 'four' }
 
   sdb.put('thing', thing, {
@@ -554,7 +554,7 @@ test('explicit json on put valueEncoding raw entry', dbWrap(function (t, ldb) {
   }, function (err) {
     t.error(err)
 
-    ldb.get(nsKey([ 'json-things' ], 'thing'), {
+    base.get(nsKey([ 'json-things' ], 'thing'), {
       valueEncoding: 'utf8'
     }, function (err, value) {
       t.error(err)
@@ -566,11 +566,11 @@ test('explicit json on put valueEncoding raw entry', dbWrap(function (t, ldb) {
 }))
 
 
-test('custom keyEncoding on get', dbWrap(function (t, ldb) {
+test('custom keyEncoding on get', dbWrap(function (t, base) {
   var dbs = [
-    ldb,
-    space(ldb, 'test space 1'),
-    space(ldb, 'test space 2'),
+    base,
+    subspace(base, 'test space 1'),
+    subspace(base, 'test space 2'),
   ]
   var done = after(dbs.length * 2, verify)
 
@@ -615,11 +615,11 @@ test('custom keyEncoding on get', dbWrap(function (t, ldb) {
 }))
 
 
-test('custom keyEncoding on put', dbWrap(function (t, ldb) {
+test('custom keyEncoding on put', dbWrap(function (t, base) {
   var dbs = [
-    ldb,
-    space(ldb, 'test space 1'),
-    space(ldb, 'test space 2'),
+    base,
+    subspace(base, 'test space 1'),
+    subspace(base, 'test space 2'),
   ]
   var done = after(dbs.length * 2, verify)
 
@@ -643,11 +643,11 @@ test('custom keyEncoding on put', dbWrap(function (t, ldb) {
 }))
 
 
-test('custom keyEncoding on db', dbWrap(function (t, ldb) {
+test('custom keyEncoding on db', dbWrap(function (t, base) {
   var dbs = [
-    ldb,
-    space(ldb, 'test space 1'),
-    space(ldb, 'test space 2', { keyEncoding: bytewise }),
+    base,
+    subspace(base, 'test space 1'),
+    subspace(base, 'test space 2', { keyEncoding: bytewise }),
   ]
   var done = after(dbs.length * 2, verify)
 
@@ -675,9 +675,9 @@ function readStreamTest(options) {
   test('test readStream with ' + inspect(options), function (t) {
     var ref1Db = levelup(testDb + '.ref')
     var ref2Db = levelup(testDb + '.ref2')
-    var ldb = levelup(testDb)
-    var sdb1 = space(ldb, 'test space')
-    var sdb2 = space(sdb1, 'inner space ')
+    var base = levelup(testDb)
+    var sdb1 = subspace(base, 'test space')
+    var sdb2 = subspace(sdb1, 'inner space ')
     var ref1List
     var ref2List
     var sdb1List
@@ -686,13 +686,13 @@ function readStreamTest(options) {
 
     ref1Db.on('ready', done)
     ref2Db.on('ready', done)
-    ldb.on('ready', done)
+    base.on('ready', done)
 
     function prepare() {
       var batches = [
         ref1Db.batch(),
         ref2Db.batch(),
-        ldb.batch(),
+        base.batch(),
         sdb1.batch(),
         sdb2.batch()
       ]
@@ -782,7 +782,7 @@ function readStreamTest(options) {
 
       ref1Db.close(done)
       ref2Db.close(done)
-      ldb.close(done)
+      base.close(done)
     }
   })
 }
