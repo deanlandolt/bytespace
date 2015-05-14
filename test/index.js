@@ -615,8 +615,7 @@ test('custom keyEncoding on get', dbWrap(function (t, ldb) {
 }))
 
 
-// FIXME this one's pretty damn important!
-test.skip('custom keyEncoding on put', dbWrap(function (t, ldb) {
+test('custom keyEncoding on put', dbWrap(function (t, ldb) {
   var dbs = [
     ldb,
     space(ldb, 'test space 1'),

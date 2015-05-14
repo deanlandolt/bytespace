@@ -87,15 +87,18 @@ function space(db, ns, options) {
 
 
 function prePut(key, value, options, cb, next) {
+  options.keyEncoding = 'binary'
   next(this.encode(key), value, options, cb)
 }
 
 
 function preDel(key, options, cb, next) {
+  options.keyEncoding = 'binary'
   next(this.encode(key), options, cb)
 }
 
 function preBatch(array, options, cb, next) {
+  options.keyEncoding = 'binary'
   var narray = array
 
   if (Array.isArray(array)) {
@@ -111,6 +114,7 @@ function preBatch(array, options, cb, next) {
 
 
 function preGet(key, options, cb, next) {
+  options.keyEncoding = 'binary'
   next(this.encode(key), options, cb)
 }
 
