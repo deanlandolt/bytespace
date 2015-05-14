@@ -22,7 +22,10 @@ Namespace.prototype.contains = function (key) {
   return compare(this.prefix, key.slice(0, this.prefix.length)) === 0
 }
 
-Namespace.prototype.decode = function (key, options) {
+Namespace.prototype.decode = function (key) {
+  if (typeof key === 'string')
+    key = new Buffer(key)
+
   if (!this.contains(key))
     return key
 
@@ -32,7 +35,10 @@ Namespace.prototype.decode = function (key, options) {
   return key.slice(this.prefix.length)
 }
 
-Namespace.prototype.encode = function (key, options) {
+Namespace.prototype.encode = function (key) {
+  if (typeof key === 'string')
+    key = new Buffer(key)
+
   return Buffer.concat([ this.prefix, key ])
 }
 
@@ -52,12 +58,6 @@ function space(db, ns, options) {
   }
 
   options || (options = {})
-
-  //
-  // encode as binary but preserve original (defaults to "utf8" per levelup API)
-  //
-  ns.options = xtend(options)
-  options.keyEncoding = 'binary'
 
   function factory() {
     var base = updown(db)
@@ -87,12 +87,12 @@ function space(db, ns, options) {
 
 
 function prePut(key, value, options, cb, next) {
-  next(this.encode(key, options), value, options, cb)
+  next(this.encode(key), value, options, cb)
 }
 
 
 function preDel(key, options, cb, next) {
-  next(this.encode(key, options), options, cb)
+  next(this.encode(key), options, cb)
 }
 
 function preBatch(array, options, cb, next) {
@@ -102,7 +102,7 @@ function preBatch(array, options, cb, next) {
     narray = []
     for (var i = 0, length = array.length; i < length; i++) {
       narray[i] = xtend(array[i])
-      narray[i].key = this.encode(narray[i].key, options)
+      narray[i].key = this.encode(narray[i].key)
     }
   }
 
@@ -111,17 +111,24 @@ function preBatch(array, options, cb, next) {
 
 
 function preGet(key, options, cb, next) {
-  next(this.encode(key, options), options, cb)
+  next(this.encode(key), options, cb)
 }
 
 
 function postGet(key, options, err, value, cb, next) {
-  next(this.decode(key, options), options, err, value, cb)
+  next(this.decode(key), options, err, value, cb)
 }
 
 
-function postNext(options, err, key, value, cb, next) {
-  next(err, (err || key == null) ? key : this.decode(key, options), value, cb)
+function postNext(keyAsBuffer, err, key, value, cb, next) {
+  //
+  // pass through errors and null calls for end-of-iterator
+  //
+  if (err || key == null)
+    return next(err, key, value, cb)
+
+  key = this.decode(key)
+  next(err, err ? key : keyAsBuffer ? key : key.toString('utf8'), value, cb)
 }
 
 
@@ -131,6 +138,8 @@ var rangeKeys = [ 'start', 'end', 'gt', 'lt', 'gte', 'lte' ]
 
 function preIterator(pre) {
   var options = xtend(pre.options)
+  var keyAsBuffer = options.keyAsBuffer
+  options.keyAsBuffer = true
 
   var has = {}
   rangeKeys.forEach(function (key) {
@@ -178,7 +187,7 @@ function preIterator(pre) {
     options.lt = this.encode(UPPER_BOUND, options)
   }
 
-  var $postNext = postNext.bind(this, options)
+  var $postNext = postNext.bind(this, keyAsBuffer)
 
   function wrappedFactory(options) {
     var iterator = pre.factory(options)

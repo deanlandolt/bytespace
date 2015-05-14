@@ -12,27 +12,27 @@ var bytewise = space.bytewise
 var testDb  = __dirname + '/__test.db'
 
 
-function readStreamToList (readStream, callback) {
+function readStreamToList (readStream, cb) {
   readStream.pipe(list.obj(function (err, data) {
     if (err)
       return cb(err)
 
     data = data.map(function (entry) {
-      return [ entry.key.toString('utf8'), entry.value ]
+      return [ entry.key, entry.value ]
     })
 
-    callback(null, data)
+    cb(null, data)
   }))
 }
 
 function dbEquals (ldb, t) {
-  return function (expected, callback) {
+  return function (expected, cb) {
     readStreamToList(ldb.createReadStream({
       keyEncoding: 'hex'
     }), function (err, data) {
       t.ifError(err, 'no error')
       t.deepEqual(data, expected, 'database contains expected entries')
-      callback()
+      cb()
     })
   }
 }
@@ -65,11 +65,11 @@ function hex(key) {
   return Buffer(key).toString('hex')
 }
 
-function bwHex(ns, key) {
-  return bwKey(ns, key).toString('hex')
+function nsHex(ns, key) {
+  return nsKey(ns, key).toString('hex')
 }
 
-function bwKey(ns, key) {
+function nsKey(ns, key) {
   if (typeof key === 'string')
     key = Buffer(key)
 
@@ -91,10 +91,10 @@ test('test puts', dbWrap(function (t, ldb) {
     t.dbEquals([
       [ hex('bar0'), 'foo0' ],
       [ hex('foo0'), 'bar0' ],
-      [ bwHex([ 'test space 1' ], 'bar1'), 'foo1' ],
-      [ bwHex([ 'test space 1' ], 'foo1'), 'bar1' ],
-      [ bwHex([ 'test space 2' ], 'bar2'), 'foo2' ],
-      [ bwHex([ 'test space 2' ], 'foo2'), 'bar2' ],
+      [ nsHex([ 'test space 1' ], 'bar1'), 'foo1' ],
+      [ nsHex([ 'test space 1' ], 'foo1'), 'bar1' ],
+      [ nsHex([ 'test space 2' ], 'bar2'), 'foo2' ],
+      [ nsHex([ 'test space 2' ], 'foo2'), 'bar2' ],
     ], t.end)
   }
 
@@ -120,16 +120,16 @@ test('test puts @ multiple levels', dbWrap(function (t, ldb) {
     t.dbEquals([
       [ hex('bar0'), 'foo0' ],
       [ hex('foo0'), 'bar0' ],
-      [ bwHex([ 'test space 1' ], 'bar1'), 'foo1' ],
-      [ bwHex([ 'test space 1' ], 'foo1'), 'bar1' ],
-      [ bwHex([ 'test space 1', 'inner space 1' ], 'bar3'), 'foo3' ],
-      [ bwHex([ 'test space 1', 'inner space 1' ], 'foo3'), 'bar3' ],
-      [ bwHex([ 'test space 1', 'inner space 2' ], 'bar4'), 'foo4' ],
-      [ bwHex([ 'test space 1', 'inner space 2' ], 'foo4'), 'bar4' ],
-      [ bwHex([ 'test space 2' ], 'bar2'), 'foo2' ],
-      [ bwHex([ 'test space 2' ], 'foo2'), 'bar2' ],
-      [ bwHex([ 'test space 2', 'inner space 1' ], 'bar5'), 'foo5' ],
-      [ bwHex([ 'test space 2', 'inner space 1' ], 'foo5'), 'bar5' ],
+      [ nsHex([ 'test space 1' ], 'bar1'), 'foo1' ],
+      [ nsHex([ 'test space 1' ], 'foo1'), 'bar1' ],
+      [ nsHex([ 'test space 1', 'inner space 1' ], 'bar3'), 'foo3' ],
+      [ nsHex([ 'test space 1', 'inner space 1' ], 'foo3'), 'bar3' ],
+      [ nsHex([ 'test space 1', 'inner space 2' ], 'bar4'), 'foo4' ],
+      [ nsHex([ 'test space 1', 'inner space 2' ], 'foo4'), 'bar4' ],
+      [ nsHex([ 'test space 2' ], 'bar2'), 'foo2' ],
+      [ nsHex([ 'test space 2' ], 'foo2'), 'bar2' ],
+      [ nsHex([ 'test space 2', 'inner space 1' ], 'bar5'), 'foo5' ],
+      [ nsHex([ 'test space 2', 'inner space 1' ], 'foo5'), 'bar5' ],
     ], t.end)
   }
 
@@ -209,40 +209,6 @@ test('test gets @ multiple levels', dbWrap(function (t, ldb) {
 }))
 
 
-test('test gets w/ alt keyEncoding', dbWrap(function (t, ldb) {
-  var dbs = [
-    ldb,
-    space(ldb, 'test space 1'),
-    space(ldb, 'test space 2'),
-  ]
-  var done = after(dbs.length * 2, verify)
-
-  function verify (err) {
-    t.ifError(err, 'no error')
-
-    var done = after(dbs.length * 2, t.end)
-
-    dbs.forEach(function (db, i) {
-      db.get(bytewise.encode([ 'foo', i ]), function (err, value) {
-        t.ifError(err, 'no error')
-        t.equal(value, 'bar' + i, 'got expected value')
-        done()
-      })
-      db.get(bytewise.encode([ 'bar', i ]), { keyEncoding: 'binary' }, function (err, value) {
-        t.ifError(err, 'no error')
-        t.equal(value, 'foo' + i, 'got expected value')
-        done()
-      })
-    })
-  }
-
-  dbs.forEach(function (db, i) {
-    db.put(bytewise.encode([ 'foo', i ]), 'bar' + i, done)
-    db.put(bytewise.encode([ 'bar', i ]), 'foo' + i, done)
-  })
-}))
-
-
 test('test dels', dbWrap(function (t, ldb) {
   var dbs = [
     ldb,
@@ -269,8 +235,8 @@ test('test dels', dbWrap(function (t, ldb) {
 
     t.dbEquals([
       [ hex('foo0'), 'bar0' ],
-      [ bwHex([ 'test space 1' ], 'foo1'), 'bar1' ],
-      [ bwHex([ 'test space 2' ], 'foo2'), 'bar2' ],
+      [ nsHex([ 'test space 1' ], 'foo1'), 'bar1' ],
+      [ nsHex([ 'test space 2' ], 'foo2'), 'bar2' ],
     ], t.end)
   }
 
@@ -309,11 +275,11 @@ test('test dels @ multiple levels', dbWrap(function (t, ldb) {
 
     t.dbEquals([
       [ hex('foo0'), 'bar0' ],
-      [ bwHex([ 'test space 1' ], 'foo1'), 'bar1' ],
-      [ bwHex([ 'test space 1', 'inner space 1' ], 'foo3'), 'bar3' ],
-      [ bwHex([ 'test space 1', 'inner space 2' ], 'foo4'), 'bar4' ],
-      [ bwHex([ 'test space 2' ], 'foo2'), 'bar2' ],
-      [ bwHex([ 'test space 2', 'inner space 1' ], 'foo5'), 'bar5' ],
+      [ nsHex([ 'test space 1' ], 'foo1'), 'bar1' ],
+      [ nsHex([ 'test space 1', 'inner space 1' ], 'foo3'), 'bar3' ],
+      [ nsHex([ 'test space 1', 'inner space 2' ], 'foo4'), 'bar4' ],
+      [ nsHex([ 'test space 2' ], 'foo2'), 'bar2' ],
+      [ nsHex([ 'test space 2', 'inner space 1' ], 'foo5'), 'bar5' ],
     ], t.end)
   }
 
@@ -357,12 +323,12 @@ test('test batch', dbWrap(function (t, ldb) {
       [ hex('bang0'), 'boom0' ],
       [ hex('boom0'), 'bang0' ],
       [ hex('foo0'), 'bar0' ],
-      [ bwHex([ 'test space 1' ], 'bang1'), 'boom1' ],
-      [ bwHex([ 'test space 1' ], 'boom1'), 'bang1' ],
-      [ bwHex([ 'test space 1' ], 'foo1'), 'bar1' ],
-      [ bwHex([ 'test space 2' ], 'bang2'), 'boom2' ],
-      [ bwHex([ 'test space 2' ], 'boom2'), 'bang2' ],
-      [ bwHex([ 'test space 2' ], 'foo2'), 'bar2' ],
+      [ nsHex([ 'test space 1' ], 'bang1'), 'boom1' ],
+      [ nsHex([ 'test space 1' ], 'boom1'), 'bang1' ],
+      [ nsHex([ 'test space 1' ], 'foo1'), 'bar1' ],
+      [ nsHex([ 'test space 2' ], 'bang2'), 'boom2' ],
+      [ nsHex([ 'test space 2' ], 'boom2'), 'bang2' ],
+      [ nsHex([ 'test space 2' ], 'foo2'), 'bar2' ],
     ], t.end)
   }
 
@@ -407,21 +373,21 @@ test('test batch @ multiple levels', dbWrap(function (t, ldb) {
       [ hex('bang0'), 'boom0' ],
       [ hex('boom0'), 'bang0' ],
       [ hex('foo0'), 'bar0' ],
-      [ bwHex([ 'test space 1' ], 'bang1'), 'boom1' ],
-      [ bwHex([ 'test space 1' ], 'boom1'), 'bang1' ],
-      [ bwHex([ 'test space 1' ], 'foo1'), 'bar1' ],
-      [ bwHex([ 'test space 1', 'inner space 1' ], 'bang3'), 'boom3' ],
-      [ bwHex([ 'test space 1', 'inner space 1' ], 'boom3'), 'bang3' ],
-      [ bwHex([ 'test space 1', 'inner space 1' ], 'foo3'), 'bar3' ],
-      [ bwHex([ 'test space 1', 'inner space 2' ], 'bang4'), 'boom4' ],
-      [ bwHex([ 'test space 1', 'inner space 2' ], 'boom4'), 'bang4' ],
-      [ bwHex([ 'test space 1', 'inner space 2' ], 'foo4'), 'bar4' ],
-      [ bwHex([ 'test space 2' ], 'bang2'), 'boom2' ],
-      [ bwHex([ 'test space 2' ], 'boom2'), 'bang2' ],
-      [ bwHex([ 'test space 2' ], 'foo2'), 'bar2' ],
-      [ bwHex([ 'test space 2', 'inner space 1' ], 'bang5'), 'boom5' ],
-      [ bwHex([ 'test space 2', 'inner space 1' ], 'boom5'), 'bang5' ],
-      [ bwHex([ 'test space 2', 'inner space 1' ], 'foo5'), 'bar5' ],
+      [ nsHex([ 'test space 1' ], 'bang1'), 'boom1' ],
+      [ nsHex([ 'test space 1' ], 'boom1'), 'bang1' ],
+      [ nsHex([ 'test space 1' ], 'foo1'), 'bar1' ],
+      [ nsHex([ 'test space 1', 'inner space 1' ], 'bang3'), 'boom3' ],
+      [ nsHex([ 'test space 1', 'inner space 1' ], 'boom3'), 'bang3' ],
+      [ nsHex([ 'test space 1', 'inner space 1' ], 'foo3'), 'bar3' ],
+      [ nsHex([ 'test space 1', 'inner space 2' ], 'bang4'), 'boom4' ],
+      [ nsHex([ 'test space 1', 'inner space 2' ], 'boom4'), 'bang4' ],
+      [ nsHex([ 'test space 1', 'inner space 2' ], 'foo4'), 'bar4' ],
+      [ nsHex([ 'test space 2' ], 'bang2'), 'boom2' ],
+      [ nsHex([ 'test space 2' ], 'boom2'), 'bang2' ],
+      [ nsHex([ 'test space 2' ], 'foo2'), 'bar2' ],
+      [ nsHex([ 'test space 2', 'inner space 1' ], 'bang5'), 'boom5' ],
+      [ nsHex([ 'test space 2', 'inner space 1' ], 'boom5'), 'bang5' ],
+      [ nsHex([ 'test space 2', 'inner space 1' ], 'foo5'), 'bar5' ],
     ], t.end)
   }
 
@@ -465,12 +431,12 @@ test('test chained batch', dbWrap(function (t, ldb) {
       [ hex('bang0'), 'boom0' ],
       [ hex('boom0'), 'bang0' ],
       [ hex('foo0'), 'bar0' ],
-      [ bwHex([ 'test space 1' ], 'bang1'), 'boom1' ],
-      [ bwHex([ 'test space 1' ], 'boom1'), 'bang1' ],
-      [ bwHex([ 'test space 1' ], 'foo1'), 'bar1' ],
-      [ bwHex([ 'test space 2' ], 'bang2'), 'boom2' ],
-      [ bwHex([ 'test space 2' ], 'boom2'), 'bang2' ],
-      [ bwHex([ 'test space 2' ], 'foo2'), 'bar2' ],
+      [ nsHex([ 'test space 1' ], 'bang1'), 'boom1' ],
+      [ nsHex([ 'test space 1' ], 'boom1'), 'bang1' ],
+      [ nsHex([ 'test space 1' ], 'foo1'), 'bar1' ],
+      [ nsHex([ 'test space 2' ], 'bang2'), 'boom2' ],
+      [ nsHex([ 'test space 2' ], 'boom2'), 'bang2' ],
+      [ nsHex([ 'test space 2' ], 'foo2'), 'bar2' ],
     ], t.end)
   }
 
@@ -515,21 +481,21 @@ test('test batch @ multiple levels', dbWrap(function (t, ldb) {
       [ hex('bang0'), 'boom0' ],
       [ hex('boom0'), 'bang0' ],
       [ hex('foo0'), 'bar0' ],
-      [ bwHex([ 'test space 1' ], 'bang1'), 'boom1' ],
-      [ bwHex([ 'test space 1' ], 'boom1'), 'bang1' ],
-      [ bwHex([ 'test space 1' ], 'foo1'), 'bar1' ],
-      [ bwHex([ 'test space 1', 'inner space 1' ], 'bang3'), 'boom3' ],
-      [ bwHex([ 'test space 1', 'inner space 1' ], 'boom3'), 'bang3' ],
-      [ bwHex([ 'test space 1', 'inner space 1' ], 'foo3'), 'bar3' ],
-      [ bwHex([ 'test space 1', 'inner space 2' ], 'bang4'), 'boom4' ],
-      [ bwHex([ 'test space 1', 'inner space 2' ], 'boom4'), 'bang4' ],
-      [ bwHex([ 'test space 1', 'inner space 2' ], 'foo4'), 'bar4' ],
-      [ bwHex([ 'test space 2' ], 'bang2'), 'boom2' ],
-      [ bwHex([ 'test space 2' ], 'boom2'), 'bang2' ],
-      [ bwHex([ 'test space 2' ], 'foo2'), 'bar2' ],
-      [ bwHex([ 'test space 2', 'inner space 1' ], 'bang5'), 'boom5' ],
-      [ bwHex([ 'test space 2', 'inner space 1' ], 'boom5'), 'bang5' ],
-      [ bwHex([ 'test space 2', 'inner space 1' ], 'foo5'), 'bar5' ],
+      [ nsHex([ 'test space 1' ], 'bang1'), 'boom1' ],
+      [ nsHex([ 'test space 1' ], 'boom1'), 'bang1' ],
+      [ nsHex([ 'test space 1' ], 'foo1'), 'bar1' ],
+      [ nsHex([ 'test space 1', 'inner space 1' ], 'bang3'), 'boom3' ],
+      [ nsHex([ 'test space 1', 'inner space 1' ], 'boom3'), 'bang3' ],
+      [ nsHex([ 'test space 1', 'inner space 1' ], 'foo3'), 'bar3' ],
+      [ nsHex([ 'test space 1', 'inner space 2' ], 'bang4'), 'boom4' ],
+      [ nsHex([ 'test space 1', 'inner space 2' ], 'boom4'), 'bang4' ],
+      [ nsHex([ 'test space 1', 'inner space 2' ], 'foo4'), 'bar4' ],
+      [ nsHex([ 'test space 2' ], 'bang2'), 'boom2' ],
+      [ nsHex([ 'test space 2' ], 'boom2'), 'bang2' ],
+      [ nsHex([ 'test space 2' ], 'foo2'), 'bar2' ],
+      [ nsHex([ 'test space 2', 'inner space 1' ], 'bang5'), 'boom5' ],
+      [ nsHex([ 'test space 2', 'inner space 1' ], 'boom5'), 'bang5' ],
+      [ nsHex([ 'test space 2', 'inner space 1' ], 'foo5'), 'bar5' ],
     ], t.end)
   }
 
@@ -567,7 +533,7 @@ test('explicit json on db valueEncoding raw entry', dbWrap(function (t, ldb) {
   sdb.put('thing', thing, function (err) {
     t.error(err)
 
-    ldb.get(bwKey([ 'json-things' ], 'thing'), {
+    ldb.get(nsKey([ 'json-things' ], 'thing'), {
       valueEncoding: 'utf8'
     }, function (err, value) {
       t.error(err)
@@ -588,7 +554,7 @@ test('explicit json on put valueEncoding raw entry', dbWrap(function (t, ldb) {
   }, function (err) {
     t.error(err)
 
-    ldb.get(bwKey([ 'json-things' ], 'thing'), {
+    ldb.get(nsKey([ 'json-things' ], 'thing'), {
       valueEncoding: 'utf8'
     }, function (err, value) {
       t.error(err)
@@ -596,6 +562,112 @@ test('explicit json on put valueEncoding raw entry', dbWrap(function (t, ldb) {
       t.equal(value, JSON.stringify(thing))
       t.end()
     })
+  })
+}))
+
+
+test('custom keyEncoding on get', dbWrap(function (t, ldb) {
+  var dbs = [
+    ldb,
+    space(ldb, 'test space 1'),
+    space(ldb, 'test space 2'),
+  ]
+  var done = after(dbs.length * 2, verify)
+
+  function verify (err) {
+    t.ifError(err, 'no error')
+
+    var done = after(dbs.length * 3, t.end)
+
+    dbs.forEach(function (db, i) {
+      db.get(bytewise.encode([ 'foo', i ]), function (err, value) {
+        t.ifError(err, 'no error')
+        t.equal(value, 'bar' + i, 'got expected value')
+        done()
+      })
+
+      db.get([ 'bar', i ], { keyEncoding: bytewise }, function (err, value) {
+        t.ifError(err, 'no error')
+        t.equal(value, 'foo' + i, 'got expected value')
+        done()
+      })
+
+      var expected = i > 0 ? [
+        [ hex(bytewise.encode([ 'bar', i ])), 'foo' + i ],
+        [ hex(bytewise.encode([ 'foo', i ])), 'bar' + i ],
+      ] : [
+        [ hex(bytewise.encode([ 'bar', 0 ])), 'foo0' ],
+        [ hex(bytewise.encode([ 'foo', 0 ])), 'bar0' ],
+        [ nsHex([ 'test space 1' ], bytewise.encode([ 'bar', 1 ])), 'foo1' ],
+        [ nsHex([ 'test space 1' ], bytewise.encode([ 'foo', 1 ])), 'bar1' ],
+        [ nsHex([ 'test space 2' ], bytewise.encode([ 'bar', 2 ])), 'foo2' ],
+        [ nsHex([ 'test space 2' ], bytewise.encode([ 'foo', 2 ])), 'bar2' ],
+      ]
+
+      dbEquals(db, t)(expected, done)
+    })
+  }
+
+  dbs.forEach(function (db, i) {
+    db.put(bytewise.encode([ 'foo', i ]), 'bar' + i, done)
+    db.put(bytewise.encode([ 'bar', i ]), 'foo' + i, { keyEncoding: 'binary' }, done)
+  })
+}))
+
+
+// FIXME this one's pretty damn important!
+test.skip('custom keyEncoding on put', dbWrap(function (t, ldb) {
+  var dbs = [
+    ldb,
+    space(ldb, 'test space 1'),
+    space(ldb, 'test space 2'),
+  ]
+  var done = after(dbs.length * 2, verify)
+
+  function verify (err) {
+    t.ifError(err, 'no error')
+
+    t.dbEquals([
+      [ hex(bytewise.encode([ 'bar', 0 ])), 'foo0' ],
+      [ hex(bytewise.encode([ 'foo', 0 ])), 'bar0' ],
+      [ nsHex([ 'test space 1' ], bytewise.encode([ 'bar', 1 ])), 'foo1' ],
+      [ nsHex([ 'test space 1' ], bytewise.encode([ 'foo', 1 ])), 'bar1' ],
+      [ nsHex([ 'test space 2' ], bytewise.encode([ 'bar', 2 ])), 'foo2' ],
+      [ nsHex([ 'test space 2' ], bytewise.encode([ 'foo', 2 ])), 'bar2' ],
+    ], t.end)
+  }
+
+  dbs.forEach(function (db, i) {
+    db.put(bytewise.encode([ 'foo', i ]), 'bar' + i, done)
+    db.put([ 'bar', i ], 'foo' + i, { keyEncoding: bytewise }, done)
+  })
+}))
+
+
+test('custom keyEncoding on db', dbWrap(function (t, ldb) {
+  var dbs = [
+    ldb,
+    space(ldb, 'test space 1'),
+    space(ldb, 'test space 2', { keyEncoding: bytewise }),
+  ]
+  var done = after(dbs.length * 2, verify)
+
+  function verify (err) {
+    t.ifError(err, 'no error')
+
+    t.dbEquals([
+      [ hex('bar,0'), 'foo0' ],
+      [ hex(bytewise.encode([ 'foo', 0 ])), 'bar0' ],
+      [ nsHex([ 'test space 1' ], 'bar,1'), 'foo1' ],
+      [ nsHex([ 'test space 1' ], bytewise.encode([ 'foo', 1 ])), 'bar1' ],
+      [ nsHex([ 'test space 2' ], bytewise.encode(bytewise.encode([ 'foo', 2 ]))), 'bar2' ],
+      [ nsHex([ 'test space 2' ], bytewise.encode([ 'bar', 2 ])), 'foo2' ],
+    ], t.end)
+  }
+
+  dbs.forEach(function (db, i) {
+    db.put(bytewise.encode([ 'foo', i ]), 'bar' + i, done)
+    db.put([ 'bar', i ], 'foo' + i, done)
   })
 }))
 
