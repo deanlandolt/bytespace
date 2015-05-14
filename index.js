@@ -4,25 +4,23 @@ var levelup = require('levelup')
 var updown = require('level-updown')
 var xtend = require('xtend')
 
-var arrayBoundary = bytewise.sorts.array.bound
-
 //
-// brand namespace to keep track of subspace root
+// brand prefix instance to keep track of subspace root
 //
-function Namespace(path) {
+function Prefix(path) {
   this.path = path
-  this.prefix = bytewise.encode(path)
+  this.buffer = bytewise.encode(path)
 }
 
-Namespace.prototype.append = function (sub) {
-  return new Namespace(this.path.concat(sub))
+Prefix.prototype.append = function (sub) {
+  return new Prefix(this.path.concat(sub))
 }
 
-Namespace.prototype.contains = function (key) {
-  return compare(this.prefix, key.slice(0, this.prefix.length)) === 0
+Prefix.prototype.contains = function (key) {
+  return compare(this.buffer, key.slice(0, this.buffer.length)) === 0
 }
 
-Namespace.prototype.decode = function (key) {
+Prefix.prototype.decode = function (key) {
   if (typeof key === 'string')
     key = new Buffer(key)
 
@@ -30,31 +28,31 @@ Namespace.prototype.decode = function (key) {
     return key
 
   //
-  // slice off namespace prefix and return
+  // slice prefix and return
   //
-  return key.slice(this.prefix.length)
+  return key.slice(this.buffer.length)
 }
 
-Namespace.prototype.encode = function (key) {
+Prefix.prototype.encode = function (key) {
   if (typeof key === 'string')
     key = new Buffer(key)
 
-  return Buffer.concat([ this.prefix, key ])
+  return Buffer.concat([ this.buffer, key ])
 }
 
-function space(db, ns, options) {
-  if (!(ns instanceof Namespace)) {
+function space(db, namespace, options) {
+  var prefix = namespace
+  if (!(prefix instanceof Prefix)) {
     //
     // if db is a subspace mount as a nested subspace
     //
-    if (typeof db.subspace === 'function') {
-      return db.subspace(ns, options)
-    }
+    if (typeof db.subspace === 'function')
+      return db.subspace(namespace, options)
     
     //
     // otherwise this is a top level subspace
     //
-    ns = new Namespace([ ns ])
+    prefix = new Prefix([ namespace ])
   }
 
   options || (options = {})
@@ -63,12 +61,12 @@ function space(db, ns, options) {
     var base = updown(db)
 
     base.extendWith({
-      prePut: prePut.bind(ns),
-      preDel: preDel.bind(ns),
-      preBatch: preBatch.bind(ns),
-      preGet: preGet.bind(ns),
-      postGet: postGet.bind(ns),
-      preIterator: preIterator.bind(ns)
+      prePut: prePut.bind(prefix),
+      preDel: preDel.bind(prefix),
+      preBatch: preBatch.bind(prefix),
+      preGet: preGet.bind(prefix),
+      postGet: postGet.bind(prefix),
+      preIterator: preIterator.bind(prefix)
     })
 
     return base
@@ -78,8 +76,8 @@ function space(db, ns, options) {
 
   var sub = levelup(options)
 
-  sub.subspace = function (subNs, options) {
-    return space(db, ns.append(subNs), options)
+  sub.subspace = function (namespace, options) {
+    return space(db, prefix.append(namespace), options)
   }
 
   return sub
