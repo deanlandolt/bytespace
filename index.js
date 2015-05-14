@@ -12,8 +12,8 @@ function Prefix(path) {
   this.buffer = bytewise.encode(path)
 }
 
-Prefix.prototype.append = function (sub) {
-  return new Prefix(this.path.concat(sub))
+Prefix.prototype.append = function (namespace) {
+  return new Prefix(this.path.concat(namespace))
 }
 
 Prefix.prototype.contains = function (key) {
@@ -41,7 +41,10 @@ Prefix.prototype.encode = function (key) {
   return Buffer.concat([ this.buffer, key ])
 }
 
-function space(db, namespace, options) {
+//
+// create a bytespace given a provided levelup instance
+//
+function bytespace(db, namespace, options) {
   var prefix = namespace
   if (!(prefix instanceof Prefix)) {
     //
@@ -75,13 +78,13 @@ function space(db, namespace, options) {
 
   options.db = factory
 
-  var sub = levelup(options)
+  var space = levelup(options)
 
-  sub.subspace = function (namespace, options) {
-    return space(db, prefix.append(namespace), options)
+  space.subspace = function (namespace, options) {
+    return bytespace(db, prefix.append(namespace), options)
   }
 
-  return sub
+  return space
 }
 
 
@@ -95,6 +98,7 @@ function preDel(key, options, cb, next) {
   options.keyEncoding = 'binary'
   next(this.encode(key), options, cb)
 }
+
 
 function preBatch(array, options, cb, next) {
   options.keyEncoding = 'binary'
@@ -208,10 +212,9 @@ function preIterator(pre) {
   }
 }
 
-
 //
 // add ref to bytewise as a convenience
 //
-space.bytewise = bytewise
+bytespace.bytewise = bytewise
 
-module.exports = space
+module.exports = bytespace

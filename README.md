@@ -1,10 +1,10 @@
-# bytewise-space
+# bytespace
 
-Efficient keypath subspaces with bytewise tuples. A lot like `level-sublevel` but simpler. More like `level-spaces`, but allows you to use arbitrarily complex keys for your subspace rather than just strings.
+Efficient keypath subspaces prefixed with bytewise tuples. A lot like `level-sublevel` but simpler. Built on `level-updown`, `bytespace` allows you to use arbirarily complex keys for subspace prefixes, and any `keyEncoding` you prefer for your subspace suffix keyspace.
 
 
 ```js
-var space = require('bytewise-space')
+var bytespace = require('bytespace')
 var levelup = require('levelup')
 var db = levelup('./mydb')
 
@@ -15,16 +15,16 @@ var options = {
 }
 
 // same API as levelup
-var appDb = space(db, 'myapp', options)
+var appDb = bytespace(db, 'myapp', options)
 
 // you can mount subspaces within subspaces
-var nestedDb = space(myapp, 'nested')
+var nestedDb = bytespace(myapp, 'nested')
 
 // namespace can be any bytewise-serializable value
-var testDb = space(appDb, new Date())
+var testDb = bytespace(appDb, new Date())
 
 // namespaces may also be mounted sublevel-style
-var subDb = testDb.sublevel('another')
+var subDb = testDb.subspace('another')
 ```
 
 ## Rooted keypaths
@@ -34,7 +34,7 @@ The subspace db instance itself is essentially a keyspace `chroot` -- a jail you
 
 ## Nested subspaces
 
-When instantiating a subspace, it will test the provided `db` reference to determine if it's a `bytewise-subspace` instance. If so, it will call the `subspace` method with the provided options to create the new subspace. Rather than running through the encode/decode process mulitple times, the responsibility of encoding and decoding keys is delegated to the root subspace, but all keys will be correctly prefixed within the subspace.
+When instantiating a subspace, it will test the provided `db` reference to determine if it's a `bytewise-subspace` instance. If so, it will call the `subspace` method with the provided options to create the new subspace. Rather than running through the encode/decode process mulitple times, the responsibility of encoding and decoding keys is delegated to the root subspace. All keys will be correctly prefixed to the appropriate subspace.
 
 
 ### Hooks
@@ -42,17 +42,8 @@ When instantiating a subspace, it will test the provided `db` reference to deter
 TODO
 
 
-### Compatibility with `level-sublevel`
-
-The API is close enough to that of [sublevel](https://github.com/dominictarr/level-sublevel) that it ought to be feasible to create an wrapper utility to lift a subspace into API compatiblity with `sublevel`. (We could just adapt the sublevel API wholesale, but this could get confusing.)
-
 ## Encoding
 
-*NOTE: NYI* (implemented with nested arrays for now, which are just as correct at the expense of slightly more encoding overhead.)
+Subspace keys are encoded as bytewise-prefixed arrays. This allows subspace keys to be appended as the last element of a namespace without overhead. Encoded subspace keys can be appended to the precomputed namespace buffer with a single `Buffer.concat` operation. Mounting a subspace adds another element to the prefix tuple. This serialization ensures that keys of different subspaces cannot interleave.
 
-Subspace keys are encoded as length-prefixed arrays. This allows subspace keys to be appended as the last element of a namespace without the overhead required to escape certain bytes in regular arrays. Encoded subspace keys can be appended to the precomputed namespace buffer with a single `Buffer.concat` operation. Keys of a top level subspace would be two element tuple, the first element being the namespace key. Mounting a subspace adds another element to this tuple. The last element is always the subspace-specific key of each record. This serialization ensures that keys of different subspaces cannot possibly interleave, while allowing for inexpensive key manipulation. When encoding keys, the encoded namespace buffer can be efficiently concatenated with a subspace key. When decoding, the namespace portion can be slice off and ignored.
-
-
-### Subspace keys
-
-The last element of the keypath tuple -- the subspace key -- is serialized as a buffer and concatenated to the namespace buffer. If you're using bytewise keys in your subspace you will end up with a complete keypath that's correctly bytewise-encoded. If using another encoding, the final keypath cannot be decoded directly in bytewise, but the fact that keys are length-prefixed should be enough of a clue for tooling (e.g. levelui) to treat the last element as an opaque buffer, just as if it were a top level key.
+When encoding keys, the encoded namespace buffer can be efficiently concatenated with a subspace key. When decoding, the namespace portion can be sliced off and ignored. Testing for subspace inclusion is also just a single buffer slice.
