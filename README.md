@@ -1,6 +1,10 @@
 # bytespace
 
-Efficient keypath subspaces prefixed with bytewise tuples. A lot like `level-sublevel` but simpler. Built on `level-updown`, `bytespace` allows you to use arbirarily complex keys for subspace prefixes, and any `keyEncoding` you prefer for your subspace suffix keyspace.
+Efficient keypath subspaces prefixed with bytewise tuples.
+
+[![build status](https://travis-ci.org/deanlandolt/bytespace.svg)
+
+A lot like `level-sublevel` but simpler. Built on `level-updown`, `bytespace` allows you to use arbirarily complex keys for subspace prefixes, and any `keyEncoding` you prefer for your subspace suffix keyspace.
 
 
 ```js
