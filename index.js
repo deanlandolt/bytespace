@@ -1,5 +1,6 @@
 var assert = require('assert')
 var bytewise = require('bytewise-core')
+var equal = require('bytewise-core/util').equal
 var levelup = require('levelup')
 var updown = require('level-updown')
 var xtend = require('xtend')
@@ -20,11 +21,12 @@ Prefix.prototype.contains = function (key) {
   //
   // slice to get key prefix
   //
-  assert(Buffer.isBuffer(key))
-  return this.buffer.equals(key.slice(0, this.buffer.length))
+  return equal(this.buffer, key.slice(0, this.buffer.length))
 }
 
 Prefix.prototype.decode = function (key) {
+  assert(Buffer.isBuffer(key))
+
   if (!this.contains(key))
     return key
 
