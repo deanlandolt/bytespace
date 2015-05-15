@@ -1,4 +1,5 @@
 var assert = require('assert')
+var Batch = require('./batch')
 var bytewise = require('bytewise-core')
 var equal = require('bytewise-core/util').equal
 var levelup = require('levelup')
@@ -88,25 +89,33 @@ function bytespace(db, namespace, options) {
   // hook write methods to capture original keys and invoke commit hooks
   //
   space.put = function (key, value, options, cb) {
-    space.batch([{ type: 'put', key: key, value: value }], options, cb)
+    space.batch([{
+      type: 'put',
+      key: key,
+      value: value,
+      options: options
+    }], options, cb)
   }
 
   space.del = function (key, options, cb) {
-    space.batch([{ type: 'del', key: key }], options, cb)
+    space.batch([{
+      type: 'del',
+      key: key,
+      options: options
+    }], options, cb)
   }
 
   var _batch = space.batch
-  space.batch = function (batch, options, cb) {
-    // TODO: commit hooks for chained batch
+  space.batch = function (array, options, cb) {
     if (!arguments.length)
-      return _batch.call(space)
+      return new Batch(space)
 
     if (prefix.precommit)
-      batch = prefix.precommit(batch)
+      array = prefix.precommit(array)
 
-    _batch.call(space, batch, options, function (err) {
+    _batch.call(space, array, options, function (err) {
       if (prefix.postcommit)
-        err = prefix.postcommit(err, batch)
+        err = prefix.postcommit(err, array)
 
       cb(err)
     })
@@ -123,11 +132,11 @@ function bytespace(db, namespace, options) {
 }
 
 
-function preBatch(batch, options, cb, next) {
+function preBatch(array, options, cb, next) {
   var encoded = []
   var op
-  for (var i = 0, length = batch.length; i < length; i++) {
-    op = encoded[i] = xtend(batch[i])
+  for (var i = 0, length = array.length; i < length; i++) {
+    op = encoded[i] = xtend(array[i])
     op.key = this.encode(op.key)
     op.keyEncoding = 'binary'
   }
@@ -231,7 +240,7 @@ function preIterator(pre) {
 
 function postNext(keyAsBuffer, err, key, value, cb, next) {
   //
-  // pass through errors and null calls for end-of-iterator
+  // pass through errors and null end-of-iterator values
   //
   if (err || key == null)
     return next(err, key, value, cb)
