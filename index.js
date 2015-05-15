@@ -1,6 +1,5 @@
 var assert = require('assert')
 var bytewise = require('bytewise-core')
-var domain = require('domain')
 var equal = require('bytewise-core/util').equal
 var levelup = require('levelup')
 var updown = require('level-updown')
@@ -98,98 +97,35 @@ function bytespace(db, namespace, options) {
   return space
 }
 
-
 function prePut(key, value, options, cb, next) {
-  var ops = [{ type: 'put', key: key, value: value }]
-
-  //
-  // only run hooks if we aren't currently within a transaction context
-  //
-  var tx = domain.active
-  var unscoped = !tx
-  if (unscoped) {
-    tx = domain.create()
-    tx.on('error', function (err) {
-      tx.abort || (tx.abort = err)
-    })
-  }
-
-  var prefix = this
-  tx.run(function () {
-    ops = (unscoped && prefix.precommit) ? prefix.precommit(ops) : ops
-
-    prefix.batch(ops, options, function (err) {
-      unscoped && tx.exit()
-      cb(err)
-    })
-  })
+  this.batch([{ type: 'put', key: key, value: value }], options, cb)
 }
 
 
 function preDel(key, options, cb, next) {
-  var ops = [{ type: 'del', key: key, value: null }]
-
-  //
-  // only run hooks if we aren't currently within a transaction context
-  //
-  var tx = domain.active
-  var unscoped = !tx
-  if (unscoped) {
-    tx = domain.create()
-    tx.on('error', function (err) {
-      tx.abort || (tx.abort = err)
-    })
-  }
-
-  var prefix = this
-  tx.run(function () {
-    ops = (unscoped && prefix.precommit) ? prefix.precommit(ops) : ops
-
-    prefix.batch(ops, options, function (err) {
-      unscoped && tx.exit()
-      cb(err)
-    })
-  })
+  this.batch([{ type: 'del', key: key }], options, cb)
 }
 
 
-function preBatch(ops, options, cb, next) {
-  //
-  // only run hooks if we aren't currently within a transaction context
-  //
-  var tx = domain.active
-  var unscoped = !tx
-  if (unscoped) {
-    tx = domain.create()
-    tx.on('error', function (err) {
-      tx.abort || (tx.abort = err)
-    })
+function preBatch(array, options, cb, next) {
+  var batch = array.map(xtend)
+  if (this.precommit)
+    batch = this.precommit(batch)
+
+  var encoded = []
+  var op
+  for (var i = 0, length = batch.length; i < length; i++) {
+    op = encoded[i] = xtend(batch[i])
+    op.key = this.encode(op.key)
+    op.keyEncoding = 'binary'
   }
 
   var prefix = this
-  tx.run(function () {
-    ops = (unscoped && prefix.precommit) ? prefix.precommit(ops) : ops
-    if (tx.abort) {
-      tx.exit()
-      return cb(tx.abort)
-    }
+  next(encoded, options, function (err) {
+    if (prefix.postcommit)
+      batch = prefix.postcommit(err, batch)
 
-    options.keyEncoding = 'binary'
-    var array = ops
-    var op
-
-    if (Array.isArray(ops)) {
-      array = []
-      for (var i = 0, length = ops.length; i < length; i++) {
-        op = array[i] = xtend(ops[i])
-        op.key = prefix.encode(op.key)
-      }
-    }
-
-    next(array, options, function (err) {
-      unscoped && tx.exit()
-      cb(err)
-    })
+    cb(err, err ? null : batch)
   })
 }
 
