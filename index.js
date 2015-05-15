@@ -32,7 +32,7 @@ Prefix.prototype.decode = function (key) {
     return key
 
   //
-  // slice prefix and return
+  // slice off prefix and return the rest
   //
   return key.slice(this.buffer.length)
 }
@@ -69,11 +69,8 @@ function bytespace(db, namespace, options) {
 
   function factory() {
     var base = updown(db)
-    prefix.batch = base._batch.bind(base)
 
     base.extendWith({
-      prePut: prePut.bind(prefix),
-      preDel: preDel.bind(prefix),
       preBatch: preBatch.bind(prefix),
       preGet: preGet.bind(prefix),
       postGet: postGet.bind(prefix),
@@ -88,33 +85,45 @@ function bytespace(db, namespace, options) {
   var space = levelup(options)
 
   //
+  // hook write methods to capture original keys and invoke commit hooks
+  //
+  space.put = function (key, value, options, cb) {
+    space.batch([{ type: 'put', key: key, value: value }], options, cb)
+  }
+
+  space.del = function (key, options, cb) {
+    space.batch([{ type: 'del', key: key }], options, cb)
+  }
+
+  var _batch = space.batch
+  space.batch = function (batch, options, cb) {
+    // TODO: commit hooks for chained batch
+    if (!arguments.length)
+      return _batch.call(space)
+
+    if (prefix.precommit)
+      batch = prefix.precommit(batch)
+
+    _batch.call(space, batch, options, function (err) {
+      if (prefix.postcommit)
+        err = prefix.postcommit(err, batch)
+
+      cb(err)
+    })
+  }
+
+  //
   // allow subspace to be created without leaking ref to root db
   //
   space.subspace = function (namespace, options) {
     return bytespace(db, prefix.append(namespace), options)
   }
 
-  space.clone = function (namespace, options) {
-    return bytespace(db, prefix, options)
-  }
-
   return space
-}
-
-function prePut(key, value, options, cb, next) {
-  this.batch([{ type: 'put', key: key, value: value }], options, cb)
-}
-
-
-function preDel(key, options, cb, next) {
-  this.batch([{ type: 'del', key: key }], options, cb)
 }
 
 
 function preBatch(batch, options, cb, next) {
-  if (this.precommit)
-    batch = this.precommit(batch)
-
   var encoded = []
   var op
   for (var i = 0, length = batch.length; i < length; i++) {
@@ -123,13 +132,7 @@ function preBatch(batch, options, cb, next) {
     op.keyEncoding = 'binary'
   }
 
-  var prefix = this
-  next(encoded, options, function (err) {
-    if (prefix.postcommit)
-      batch = prefix.postcommit(err, batch)
-
-    cb(err, err ? null : batch)
-  })
+  next(encoded, options, cb)
 }
 
 
@@ -144,18 +147,6 @@ function postGet(key, options, err, value, cb, next) {
 }
 
 
-function postNext(keyAsBuffer, err, key, value, cb, next) {
-  //
-  // pass through errors and null calls for end-of-iterator
-  //
-  if (err || key == null)
-    return next(err, key, value, cb)
-
-  key = this.decode(key)
-  next(err, err ? key : keyAsBuffer ? key : key.toString('utf8'), value, cb)
-}
-
-
 var LOWER_BOUND = new Buffer([])
 var UPPER_BOUND = new Buffer([ 0xff ])
 
@@ -167,13 +158,13 @@ function preIterator(pre) {
   options.keyAsBuffer = true
 
 
-  // TODO: use ltgt range rather than hand-rolled crap
+  // TODO: use ltgt rather than hand-rolled crap
   var has = {}
   rangeKeys.forEach(function (key) {
     has[key] = key in options
   })
 
-  // TODO: updown sending phantom start value -- bug?
+  // TODO: getting phantom start value -- updown bug?
   if (has.start && (has.gt || has.lt || has.gte || has.lte)) {
     delete options.start
     has.start = false
@@ -235,6 +226,18 @@ function preIterator(pre) {
     options: options,
     factory: wrappedFactory
   }
+}
+
+
+function postNext(keyAsBuffer, err, key, value, cb, next) {
+  //
+  // pass through errors and null calls for end-of-iterator
+  //
+  if (err || key == null)
+    return next(err, key, value, cb)
+
+  key = this.decode(key)
+  next(err, err ? key : keyAsBuffer ? key : key.toString('utf8'), value, cb)
 }
 
 //
