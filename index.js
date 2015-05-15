@@ -2,6 +2,7 @@ var assert = require('assert')
 var bytewise = require('bytewise-core')
 var equal = require('bytewise-core/util').equal
 var levelup = require('levelup')
+var ltgt = require('ltgt')
 var updown = require('level-updown')
 var xtend = require('xtend')
 
@@ -86,6 +87,9 @@ function bytespace(db, namespace, options) {
 
   var space = levelup(options)
 
+  //
+  // allow subspace to be created without leaking ref to root db
+  //
   space.subspace = function (namespace, options) {
     return bytespace(db, prefix.append(namespace), options)
   }
@@ -154,6 +158,7 @@ function postNext(keyAsBuffer, err, key, value, cb, next) {
 
 var LOWER_BOUND = new Buffer([])
 var UPPER_BOUND = new Buffer([ 0xff ])
+
 var rangeKeys = [ 'start', 'end', 'gt', 'lt', 'gte', 'lte' ]
 
 function preIterator(pre) {
@@ -161,29 +166,36 @@ function preIterator(pre) {
   var keyAsBuffer = options.keyAsBuffer
   options.keyAsBuffer = true
 
+
+  // TODO: use ltgt range rather than hand-rolled crap
   var has = {}
   rangeKeys.forEach(function (key) {
     has[key] = key in options
   })
 
+  // TODO: updown sending phantom start value -- bug?
+  if (has.start && (has.gt || has.lt || has.gte || has.lte)) {
+    delete options.start
+    has.start = false
+  }
+
+  // var lower = this.encode(LOWER_BOUND)
+  // var upper = this.encode(UPPER_BOUND)
+  // ltgt.toLtgt(options, options, this.encode.bind(this), lower, upper)
+
   if (has.start || has.end) {
-    if (has.gt || has.lt || has.gte || has.lte) {
-      // TODO: updown sending phantom start value -- bug?
+    if (!options.reverse) {
+      options.gte = has.start ? options.start : LOWER_BOUND
+      options.lte = has.end ? options.end : UPPER_BOUND
     }
     else {
-      if (!options.reverse) {
-        options.gte = has.start ? options.start : LOWER_BOUND
-        options.lte = has.end ? options.end : UPPER_BOUND
-      }
-      else {
-        options.gte = has.end ? options.end : LOWER_BOUND
-        options.lte = has.start ? options.start : UPPER_BOUND
-      }
-
-      has.gte = has.lte = true
-      delete options.start
-      delete options.end
+      options.gte = has.end ? options.end : LOWER_BOUND
+      options.lte = has.start ? options.start : UPPER_BOUND
     }
+
+    has.gte = has.lte = true
+    delete options.start
+    delete options.end
   }
 
   if (has.gt) {
