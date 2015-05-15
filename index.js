@@ -1,72 +1,34 @@
-var assert = require('assert')
 var Batch = require('./batch')
 var bytewise = require('bytewise-core')
-var equal = require('bytewise-core/util').equal
 var levelup = require('levelup')
-var ltgt = require('ltgt')
+// var ltgt = require('ltgt')
+var Prefix = require('./prefix')
 var updown = require('level-updown')
 var xtend = require('xtend')
 
 //
-// brand prefix instance to keep track of subspace root
-//
-function Prefix(path) {
-  this.path = path
-  this.buffer = bytewise.encode(path)
-}
-
-Prefix.prototype.append = function (namespace) {
-  return new Prefix(this.path.concat(namespace))
-}
-
-Prefix.prototype.contains = function (key) {
-  //
-  // slice to get key prefix
-  //
-  return equal(this.buffer, key.slice(0, this.buffer.length))
-}
-
-Prefix.prototype.decode = function (key) {
-  assert(Buffer.isBuffer(key))
-
-  if (!this.contains(key))
-    return key
-
-  //
-  // slice off prefix and return the rest
-  //
-  return key.slice(this.buffer.length)
-}
-
-Prefix.prototype.encode = function (key) {
-  if (typeof key === 'string')
-    key = new Buffer(key)
-
-  return Buffer.concat([ this.buffer, key ])
-}
-
-//
 // create a bytespace given a provided levelup instance
 //
-function bytespace(db, namespace, options) {
-  var prefix = namespace
+function bytespace(db, ns, opts) {
+  opts || (opts = {})
+
+  var prefix = ns
   if (!(prefix instanceof Prefix)) {
     //
     // if db is a subspace mount as a nested subspace
     //
     if (typeof db.subspace === 'function')
-      return db.subspace(namespace, options)
+      return db.subspace(ns, opts)
     
     //
-    // otherwise this is a top level subspace
+    // otherwise this is a top level subspace, inherit keyEncoding from config
     //
-    prefix = new Prefix([ namespace ])
+    opts.keyEncoding || (opts.keyEncoding = bytespace.keyEncoding)
+    prefix = new Prefix([ ns ])
   }
 
-  options || (options = {})
-
-  prefix.precommit = options.precommit
-  prefix.postcommit = options.postcommit
+  prefix.precommit = opts.precommit
+  prefix.postcommit = opts.postcommit
 
   function factory() {
     var base = updown(db)
@@ -81,39 +43,33 @@ function bytespace(db, namespace, options) {
     return base
   }
 
-  options.db = factory
+  opts.db = factory
 
-  var space = levelup(options)
+  var space = levelup(opts)
 
   //
-  // hook write methods to capture original keys and invoke commit hooks
+  // hook write methods and redirect to batch
   //
-  space.put = function (key, value, options, cb) {
-    space.batch([{
-      type: 'put',
-      key: key,
-      value: value,
-      options: options
-    }], options, cb)
+  space.put = function (k, v, opts, cb) {
+    space.batch([{ type: 'put', key: k, value: v, options: opts }], opts, cb)
   }
 
-  space.del = function (key, options, cb) {
-    space.batch([{
-      type: 'del',
-      key: key,
-      options: options
-    }], options, cb)
+  space.del = function (k, opts, cb) {
+    space.batch([{ type: 'del', key: k, options: opts }], opts, cb)
   }
 
+  //
+  // hook batch method to invoke commit hooks with original keys
+  //
   var _batch = space.batch
-  space.batch = function (array, options, cb) {
+  space.batch = function (array, opts, cb) {
     if (!arguments.length)
       return new Batch(space)
 
     if (prefix.precommit)
       array = prefix.precommit(array)
 
-    _batch.call(space, array, options, function (err) {
+    _batch.call(space, array, opts, function (err) {
       if (prefix.postcommit)
         err = prefix.postcommit(err, array)
 
@@ -124,15 +80,18 @@ function bytespace(db, namespace, options) {
   //
   // allow subspace to be created without leaking ref to root db
   //
-  space.subspace = function (namespace, options) {
-    return bytespace(db, prefix.append(namespace), options)
+  space.subspace = function (ns, opts_) {
+    //
+    // subspace inherits options from parent
+    //
+    return bytespace(db, prefix.append(ns), xtend(opts, opts_))
   }
 
   return space
 }
 
 
-function preBatch(array, options, cb, next) {
+function preBatch(array, opts, cb, next) {
   var encoded = []
   var op
   for (var i = 0, length = array.length; i < length; i++) {
@@ -141,18 +100,18 @@ function preBatch(array, options, cb, next) {
     op.keyEncoding = 'binary'
   }
 
-  next(encoded, options, cb)
+  next(encoded, opts, cb)
 }
 
 
-function preGet(key, options, cb, next) {
-  options.keyEncoding = 'binary'
-  next(this.encode(key), options, cb)
+function preGet(k, opts, cb, next) {
+  opts.keyEncoding = 'binary'
+  next(this.encode(k), opts, cb)
 }
 
 
-function postGet(key, options, err, value, cb, next) {
-  next(this.decode(key), options, err, value, cb)
+function postGet(k, opts, err, v, cb, next) {
+  next(this.decode(k), opts, err, v, cb)
 }
 
 
@@ -162,67 +121,67 @@ var UPPER_BOUND = new Buffer([ 0xff ])
 var rangeKeys = [ 'start', 'end', 'gt', 'lt', 'gte', 'lte' ]
 
 function preIterator(pre) {
-  var options = xtend(pre.options)
-  var keyAsBuffer = options.keyAsBuffer
-  options.keyAsBuffer = true
+  var opts = xtend(pre.options)
+  var keyAsBuffer = opts.keyAsBuffer
+  opts.keyAsBuffer = true
 
 
-  // TODO: use ltgt rather than hand-rolled crap
+  // TODO: use ltgt rather than this hand-rolled crap
   var has = {}
-  rangeKeys.forEach(function (key) {
-    has[key] = key in options
+  rangeKeys.forEach(function (k) {
+    has[k] = k in opts
   })
 
-  // TODO: getting phantom start value -- updown bug?
+  // getting a phantom start value -- but from where?
   if (has.start && (has.gt || has.lt || has.gte || has.lte)) {
-    delete options.start
+    delete opts.start
     has.start = false
   }
 
   // var lower = this.encode(LOWER_BOUND)
   // var upper = this.encode(UPPER_BOUND)
-  // ltgt.toLtgt(options, options, this.encode.bind(this), lower, upper)
+  // ltgt.toLtgt(opts, opts, this.encode.bind(this), lower, upper)
 
   if (has.start || has.end) {
-    if (!options.reverse) {
-      options.gte = has.start ? options.start : LOWER_BOUND
-      options.lte = has.end ? options.end : UPPER_BOUND
+    if (!opts.reverse) {
+      opts.gte = has.start ? opts.start : LOWER_BOUND
+      opts.lte = has.end ? opts.end : UPPER_BOUND
     }
     else {
-      options.gte = has.end ? options.end : LOWER_BOUND
-      options.lte = has.start ? options.start : UPPER_BOUND
+      opts.gte = has.end ? opts.end : LOWER_BOUND
+      opts.lte = has.start ? opts.start : UPPER_BOUND
     }
 
     has.gte = has.lte = true
-    delete options.start
-    delete options.end
+    delete opts.start
+    delete opts.end
   }
 
   if (has.gt) {
-    options.gt = this.encode(options.gt, options)
-    delete options.gte
+    opts.gt = this.encode(opts.gt)
+    delete opts.gte
   }
   else if (has.gte) {
-    options.gte = this.encode(options.gte, options)
+    opts.gte = this.encode(opts.gte)
   }
   else {
-    options.gt = this.encode(LOWER_BOUND, options)
+    opts.gt = this.encode(LOWER_BOUND)
   }
 
   if (has.lt) {
-    options.lt = this.encode(options.lt, options)
-    delete options.lte
+    opts.lt = this.encode(opts.lt)
+    delete opts.lte
   }
   else if (has.lte)
-    options.lte = this.encode(options.lte, options)
+    opts.lte = this.encode(opts.lte)
   else {
-    options.lt = this.encode(UPPER_BOUND, options)
+    opts.lt = this.encode(UPPER_BOUND)
   }
 
   var $postNext = postNext.bind(this, keyAsBuffer)
 
-  function wrappedFactory(options) {
-    var iterator = pre.factory(options)
+  function wrappedFactory(opts) {
+    var iterator = pre.factory(opts)
 
     iterator.extendWith({
       postNext: $postNext
@@ -232,25 +191,30 @@ function preIterator(pre) {
   }
 
   return {
-    options: options,
+    options: opts,
     factory: wrappedFactory
   }
 }
 
 
-function postNext(keyAsBuffer, err, key, value, cb, next) {
+function postNext(keyAsBuffer, err, k, v, cb, next) {
   //
   // pass through errors and null end-of-iterator values
   //
-  if (err || key == null)
-    return next(err, key, value, cb)
+  if (err || k == null)
+    return next(err, k, v, cb)
 
-  key = this.decode(key)
-  next(err, err ? key : keyAsBuffer ? key : key.toString('utf8'), value, cb)
+  k = this.decode(k)
+  next(err, err ? k : keyAsBuffer ? k : k.toString('utf8'), v, cb)
 }
 
 //
-// add ref to bytewise as a convenience
+// default key encoding to ut8 per levelup API
+//
+bytespace.keyEncoding = 'utf8'
+
+//
+// add ref to bytewise encoding as a convenience
 //
 bytespace.bytewise = bytewise
 
