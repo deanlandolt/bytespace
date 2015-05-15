@@ -107,8 +107,7 @@ function preDel(key, options, cb, next) {
 }
 
 
-function preBatch(array, options, cb, next) {
-  var batch = array.map(xtend)
+function preBatch(batch, options, cb, next) {
   if (this.precommit)
     batch = this.precommit(batch)
 
