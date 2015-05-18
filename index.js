@@ -2,15 +2,14 @@ var Batch = require('./batch')
 var bytewise = require('bytewise-core')
 var levelup = require('levelup')
 // var ltgt = require('ltgt')
+var merge = require('xtend')
 var Namespace = require('./namespace')
 var updown = require('level-updown')
-var xtend = require('xtend')
 
 //
 // create a bytespace given a provided levelup instance
 //
 function bytespace(db, ns, opts) {
-  opts || (opts = {})
 
   if (!(ns instanceof Namespace)) {
     //
@@ -38,12 +37,9 @@ function bytespace(db, ns, opts) {
     return base
   }
 
-  opts.db = factory
-
+  opts = merge(db.options, opts, { db: factory })
   var space = levelup(opts)
-
   space.namespace = ns
-  ns.db = space
 
   //
   // helper to register pre and post commit hooks
@@ -66,6 +62,17 @@ function bytespace(db, ns, opts) {
   }
 
   //
+  // api-compatible with sublevel, extended to allow overloading db options
+  //
+  space.sublevel = function (ns_, opts_) {
+    return bytespace(db, ns.append(ns_), opts_)
+  }
+
+  space.clone = function () {
+    return bytespace(db, ns, opts)
+  }
+
+  //
   // override single-record write operations, redirecting to batch
   //
   space.put = function (k, v, opts, cb) {
@@ -76,10 +83,10 @@ function bytespace(db, ns, opts) {
     space.batch([{ type: 'del', key: k, options: opts }], opts, cb)
   }
 
-  function addEncodings(op, db) {
-    if (db && db.options) {
-      op.keyEncoding || (op.keyEncoding = db.options.keyEncoding)
-      op.valueEncoding || (op.valueEncoding = db.options.valueEncoding)
+  function addEncodings(op, space) {
+    if (space && space.options) {
+      op.keyEncoding || (op.keyEncoding = space.options.keyEncoding)
+      op.valueEncoding || (op.valueEncoding = space.options.valueEncoding)
     }
     return op
   }
@@ -106,12 +113,13 @@ function bytespace(db, ns, opts) {
 
       addEncodings(op, op.prefix)
 
-      op.prefix || (op.prefix = this)
+      op.prefix || (op.prefix = space)
+
       var ns = op.prefix.namespace
       if (!(ns instanceof Namespace))
-        return cb('Cannot commit to unknown db prefix')
+        return cb('Unknown prefix in commit')
 
-      ns.trigger(ns.prehooks, [ op, add, ops ])
+      ns.trigger(ns.prehooks, op.prefix, [ op, add, ops ])
     }
 
     _batch.call(space, ops, opts, function (err) {
@@ -120,21 +128,11 @@ function bytespace(db, ns, opts) {
 
       ops.forEach(function (op) {
         var ns = op.prefix.namespace
-        ns.trigger(ns.posthooks, [ op ])
+        ns.trigger(ns.posthooks, op.prefix, [ op ])
       })
 
       cb()
     })
-  }
-
-  //
-  // api-compatible with sublevel
-  //
-  space.sublevel = function (ns_, opts_) {
-    //
-    // subspace inherits options from parent space
-    //
-    return bytespace(db, ns.append(ns_), xtend(opts, opts_))
   }
 
   return space
@@ -147,7 +145,7 @@ function preBatch(array, opts, cb, next) {
   var encoded = []
   var op
   for (var i = 0, length = array.length; i < length; i++) {
-    op = encoded[i] = xtend(array[i])
+    op = encoded[i] = merge(array[i])
 
     var ns = op.prefix.namespace
     op.key = ns.encode(op.key)
@@ -179,7 +177,7 @@ var UPPER_BOUND = new Buffer([ 0xff ])
 var rangeKeys = [ 'start', 'end', 'gt', 'lt', 'gte', 'lte' ]
 
 function preIterator(pre) {
-  var opts = xtend(pre.options)
+  var opts = merge(pre.options)
   var keyAsBuffer = opts.keyAsBuffer
   opts.keyAsBuffer = true
 

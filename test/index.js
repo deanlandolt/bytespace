@@ -38,10 +38,15 @@ function dbEquals (base, t) {
   }
 }
 
-function dbWrap (testFn) {
+function dbWrap (dbOpts, testFn) {
+  if (typeof dbOpts === 'function') {
+    testFn = dbOpts
+    dbOpts = undefined
+  }
+
   return function (t) {
     rimraf.sync(testDb)
-    levelup(testDb, function (err, base) {
+    levelup(testDb, dbOpts, function (err, base) {
       t.ifError(err, 'no error')
 
       t.$end = t.end
@@ -527,6 +532,27 @@ test('explicit json valueEncoding', dbWrap(function (t, base) {
 }))
 
 
+// test('explicit json on base db valueEncoding', dbWrap({
+//   valueEncoding: 'json'
+// }, function (t, base) {
+//   var thing = { one: 'two', three: 'four' }
+//   var opt = {}
+//   var jsonDb = subspace(base, 'json-things', opt)
+
+//   jsonDb.put('thing', thing, opt, function (err) {
+//     t.ifError(err, 'no error')
+
+//     jsonDb.get('thing', opt, function (err, got) {
+//       t.ifError(err, 'no error')
+//       t.ok(got, 'got something back!')
+//       t.equal(typeof got, 'object', 'got back an object')
+//       t.deepEqual(got, thing, 'got back the right thing')
+//       t.end()
+//     })
+//   })
+// }))
+
+
 test('explicit json on db valueEncoding raw entry', dbWrap(function (t, base) {
   var sdb = subspace(base, 'json-things', { valueEncoding: 'json' })
   var thing = { one: 'two', three: 'four' }
@@ -565,6 +591,64 @@ test('explicit json on put valueEncoding raw entry', dbWrap(function (t, base) {
     })
   })
 }))
+
+
+// test('nested value encodings, utf8 on top', dbWrap({
+//   valueEncoding: 'json'
+// }, function (t, base) {
+//   var sp1 = subspace(base, 'sp1', { valueEncoding: 'utf8' })
+//   var sp2 = subspace(sp1, 'sp2', { valueEncoding: 'json' })
+//   var sp3 = subspace(sp2, 'sp3', { valueEncoding: 'utf8' })
+//   var v = '{"an":"object"}'
+//   sp3.put('k', v, function (err) {
+//     t.error(err)
+//     sp3.get('k', function (err, value) {
+//       t.error(err)
+//       t.equal(typeof value, 'string')
+//       t.equal(value, v)
+//       t.end()
+//     })
+//   })
+// }))
+
+
+// test('nested value encodings, json on top', dbWrap({
+//   valueEncoding: 'json'
+// }, function (t, base) {
+//   var sp1 = subspace(base, 'sp1', { valueEncoding: 'utf8' })
+//   var sp2 = subspace(sp1, 'sp2', { valueEncoding: 'json' })
+//   var sp3 = subspace(sp2, 'sp3', { valueEncoding: 'utf8' })
+//   var sp4 = subspace(sp3, 'sp4', { valueEncoding: 'json' })
+//   var v = { an: 'object' }
+//   sp4.put('k', v, function (err) {
+//     t.error(err)
+//     sp4.get('k', function (err, value) {
+//       t.error(err)
+//       t.equal(typeof value, 'object')
+//       t.deepEqual(value, v)
+//       t.end()
+//     })
+//   })
+// }))
+
+
+// test('nested value encodings, override', dbWrap({
+//   valueEncoding: 'json'
+// }, function (t, base) {
+//   var sp1 = subspace(base, 'sp1', { valueEncoding: 'utf8' })
+//   var sp2 = subspace(sp1, 'sp2', { valueEncoding: 'json' })
+//   var sp3 = subspace(sp2, 'sp3', { valueEncoding: 'utf8' })
+//   var v   = { an: 'object' }
+//   sp3.put('k', v, { valueEncoding: 'json' }, function (err) {
+//     t.error(err)
+//     sp3.get('k', { valueEncoding: 'json' }, function (err, value) {
+//       t.error(err)
+//       t.equal(typeof value, 'object')
+//       t.deepEqual(value, v)
+//       t.end()
+//     })
+//   })
+// }))
 
 
 test('custom keyEncoding on get', dbWrap(function (t, base) {

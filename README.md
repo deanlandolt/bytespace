@@ -15,14 +15,12 @@ var db = levelup('./mydb')
 // all the standard levelup options
 var options = {
   // keyEncoding defaults to "utf8" just like levelup
-  keyEncoding: require('bytewise')
+  keyEncoding: require('bytewise'),
+  valueEncoding: 'json'
 }
 
 // same API as levelup
 var appDb = bytespace(db, 'myapp', options)
-
-// or you can require a bytewise-encoded subspaces per sublevel's API
-var bwKeyDb = require('bytespace/bytewise')(db)
 
 // you can mount subspaces within subspaces
 var nestedDb = bytespace(myapp, 'nested')

@@ -45,9 +45,9 @@ Namespace.prototype.encode = function (k, space) {
 //
 // loop over hooks and trigger in the context of subspace
 //
-Namespace.prototype.trigger = function(hooks, args) {
+Namespace.prototype.trigger = function(hooks, space, args) {
   for (var i = 0, len = hooks.length; i < len; i++) {
-    hooks[i].apply(this.db, args)
+    hooks[i].apply(space, args)
   }
 }
 
