@@ -4,7 +4,7 @@
   "description": "Efficient keypath subspaces prefixed with bytewise tuples",
   "main": "index.js",
   "scripts": {
-    "test": "tape test | faucet"
+    "test": "tape --harmony test | faucet"
   },
   "repository": {
     "type": "git",
