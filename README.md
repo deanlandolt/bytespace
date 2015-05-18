@@ -15,11 +15,14 @@ var db = levelup('./mydb')
 // all the standard levelup options
 var options = {
   // keyEncoding defaults to "utf8" just like levelup
-  keyEncoding: require('bytewise') // or `space.bytewise` as a convenience
+  keyEncoding: require('bytewise')
 }
 
 // same API as levelup
 var appDb = bytespace(db, 'myapp', options)
+
+// or you can require a bytewise-encoded subspaces per sublevel's API
+var bwKeyDb = require('bytespace/bytewise')(db)
 
 // you can mount subspaces within subspaces
 var nestedDb = bytespace(myapp, 'nested')
@@ -27,8 +30,8 @@ var nestedDb = bytespace(myapp, 'nested')
 // namespace can be any bytewise-serializable value
 var testDb = bytespace(appDb, new Date())
 
-// namespaces may also be mounted sublevel-style
-var subDb = testDb.subspace('another')
+// subspaces may also be mounted sublevel-style
+var subDb = testDb.sublevel('another')
 ```
 
 ## Rooted keypaths
@@ -38,7 +41,7 @@ The subspace db instance itself is essentially a keyspace `chroot` -- a jail you
 
 ## Nested subspaces
 
-When instantiating a subspace, it will test the provided `db` reference to determine if it's a `bytewise-subspace` instance. If so, it will call the `sublevel` method with the provided options to create the new subspace. Rather than running through the encode/decode process mulitple times, the responsibility of encoding and decoding keys is delegated to the root subspace. All keys will be correctly prefixed to the appropriate subspace.
+When instantiating a subspace, it will test the provided `db` reference to determine if it's a `bytespace` instance. If so, it will call the `sublevel` method with the provided options to create the new subspace. Rather than running through the encode/decode process mulitple times, the responsibility of encoding and decoding keys is delegated to the root subspace. All keys will be correctly prefixed to the appropriate subspace.
 
 The `sublevel` method is API-compatible with [level-sublevel](https://github.com/dominictarr/level-sublevel), though we take an extra `options` argument to allow additional `levelup` db options to be provided.
 

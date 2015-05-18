@@ -3,27 +3,27 @@ var bytewise = require('bytewise-core')
 var equal = require('bytewise-core/util').equal
 
 //
-// brand prefix instance to keep track of subspace root
+// brand namespace instance to keep track of subspace root
 //
-function Prefix(path) {
+function Namespace(path) {
   this.path = path
   this.buffer = bytewise.encode(path)
   this.prehooks = []
   this.posthooks = []
 }
 
-Prefix.prototype.append = function (ns) {
-  return new Prefix(this.path.concat(ns))
+Namespace.prototype.append = function (ns) {
+  return new Namespace(this.path.concat(ns))
 }
 
-Prefix.prototype.contains = function (k) {
+Namespace.prototype.contains = function (k) {
   //
   // slice to get key prefix
   //
   return equal(this.buffer, k.slice(0, this.buffer.length))
 }
 
-Prefix.prototype.decode = function (k) {
+Namespace.prototype.decode = function (k) {
   assert(Buffer.isBuffer(k))
 
   if (!this.contains(k))
@@ -35,7 +35,7 @@ Prefix.prototype.decode = function (k) {
   return k.slice(this.buffer.length)
 }
 
-Prefix.prototype.encode = function (k, space) {
+Namespace.prototype.encode = function (k, space) {
   if (typeof k === 'string')
     k = new Buffer(k)
 
@@ -45,10 +45,10 @@ Prefix.prototype.encode = function (k, space) {
 //
 // loop over hooks and trigger in the context of subspace
 //
-Prefix.prototype.trigger = function(hooks, args) {
+Namespace.prototype.trigger = function(hooks, args) {
   for (var i = 0, len = hooks.length; i < len; i++) {
     hooks[i].apply(this.db, args)
   }
 }
 
-module.exports = Prefix
+module.exports = Namespace
