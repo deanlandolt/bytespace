@@ -848,39 +848,34 @@ readStreamTest({ lte: 'key50', reverse: true, limit: 40 })
 
 
 test('precommit hooks', dbWrap(function (t, base) {
-  var calls = [ 0, 0 ]
   var dbs = [
     base,
-    subspace(base, 'test space 1', {
-      precommit: function (ops) {
-        calls[0]++
-        ops.forEach(function (op) {
-          t.equal(typeof op.key, 'string')
-
-          op.key = op.key.toUpperCase()
-        })
-        return ops
-      }
-    }),
-    subspace(base, 'test space 2', {
-      precommit: function (ops) {
-        calls[1]++
-        ops.forEach(function (op) {
-          t.equal(typeof op.key, 'string')
-
-          op = xtend(op)
-          op.key += ' xxx'
-          ops.push(op)
-        })
-        return ops
-      }
-    })
+    subspace(base, 'test space 1'),
+    subspace(base, 'test space 2'),
   ]
+  var calls = [ 0, 0, 0 ]
+
+  //
+  // add pre hooks
+  //
+  dbs[1].pre(function (op, add, ops) {
+    t.equal(typeof op.key, 'string')
+    calls[1]++
+    op.key = op.key.toUpperCase()
+  })
+  dbs[2].pre(function (op, add, ops) {
+    t.equal(typeof op.key, 'string')
+    calls[2]++
+    op = xtend(op)
+    op.key += ' xxx'
+    add(op)
+  })
+
   var done = after(dbs.length * 2, afterPut)
 
   function afterPut (err) {
     t.ifError(err, 'no error')
-    t.deepEqual(calls, [ 2, 2 ])
+    t.deepEqual(calls, [ 0, 2, 2 ])
 
     var done = after(dbs.length, verify)
 
@@ -896,7 +891,7 @@ test('precommit hooks', dbWrap(function (t, base) {
   function verify (err) {
     t.ifError(err, 'no error')
 
-    t.deepEqual(calls, [ 3, 3 ])
+    t.deepEqual(calls, [ 0, 5, 5 ])
 
     t.dbEquals([
       [ hex('bang0'), 'boom0' ],
@@ -923,39 +918,34 @@ test('precommit hooks', dbWrap(function (t, base) {
 
 
 test('precommit hooks, chained batches', dbWrap(function (t, base) {
-  var calls = [ 0, 0 ]
   var dbs = [
     base,
-    subspace(base, 'test space 1', {
-      precommit: function (ops) {
-        calls[0]++
-        ops.forEach(function (op) {
-          t.equal(typeof op.key, 'string')
-
-          op.key = op.key.toUpperCase()
-        })
-        return ops
-      }
-    }),
-    subspace(base, 'test space 2', {
-      precommit: function (ops) {
-        calls[1]++
-        ops.forEach(function (op) {
-          t.equal(typeof op.key, 'string')
-
-          op = xtend(op)
-          op.key += ' xxx'
-          ops.push(op)
-        })
-        return ops
-      }
-    })
+    subspace(base, 'test space 1'),
+    subspace(base, 'test space 2'),
   ]
+  var calls = [ 0, 0, 0 ]
+
+  //
+  // add pre hooks
+  //
+  dbs[1].pre(function (op, add, ops) {
+    t.equal(typeof op.key, 'string')
+    calls[1]++
+    op.key = op.key.toUpperCase()
+  })
+  dbs[2].pre(function (op, add, ops) {
+    t.equal(typeof op.key, 'string')
+    calls[2]++
+    op = xtend(op)
+    op.key += ' xxx'
+    add(op)
+  })
+
   var done = after(dbs.length * 2, afterPut)
 
   function afterPut (err) {
     t.ifError(err, 'no error')
-    t.deepEqual(calls, [ 2, 2 ])
+    t.deepEqual(calls, [ 0, 2, 2 ])
 
     var done = after(dbs.length, verify)
 
@@ -974,7 +964,7 @@ test('precommit hooks, chained batches', dbWrap(function (t, base) {
   function verify (err) {
     t.ifError(err, 'no error')
 
-    t.deepEqual(calls, [ 3, 3 ])
+    t.deepEqual(calls, [ 0, 5, 5 ])
 
     t.dbEquals([
       [ hex('bang0'), 'boom0' ],

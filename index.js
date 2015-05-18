@@ -6,6 +6,8 @@ var Prefix = require('./prefix')
 var updown = require('level-updown')
 var xtend = require('xtend')
 
+var prefixes = new WeakMap()
+
 //
 // create a bytespace given a provided levelup instance
 //
@@ -17,18 +19,15 @@ function bytespace(db, ns, opts) {
     //
     // if db is a subspace mount as a nested subspace
     //
-    if (typeof db.subspace === 'function')
-      return db.subspace(ns, opts)
+    if (prefixes.get(db))
+      return db.sublevel(ns, opts)
     
     //
-    // otherwise this is a top level subspace, inherit keyEncoding from config
+    // otherwise it's a top level subspace, inherit keyEncoding from config
     //
     opts.keyEncoding || (opts.keyEncoding = bytespace.keyEncoding)
     prefix = new Prefix([ ns ])
   }
-
-  prefix.precommit = opts.precommit
-  prefix.postcommit = opts.postcommit
 
   function factory() {
     var base = updown(db)
@@ -48,7 +47,33 @@ function bytespace(db, ns, opts) {
   var space = levelup(opts)
 
   //
-  // hook write methods and redirect to batch
+  // associate prefix with space weakly, and add ref to space to prefx
+  //
+  prefixes.set(space, prefix)
+  prefix.db = space
+
+  //
+  // helper to register pre and post commit hooks
+  //
+  function addHook(hooks, hook) {
+    hooks.push(hook)
+    return function () {
+      var i = hooks.indexOf(hook)
+      if (~i)
+        return hooks.splice(i, 1)
+    }
+  }
+
+  space.pre = function (hook) {
+    return addHook(prefix.prehooks, hook)
+  }
+
+  space.post = function (hook) {
+    return addHook(prefix.posthooks, hook)
+  }
+
+  //
+  // override single-record write operations, redirecting to batch
   //
   space.put = function (k, v, opts, cb) {
     space.batch([{ type: 'put', key: k, value: v, options: opts }], opts, cb)
@@ -58,31 +83,61 @@ function bytespace(db, ns, opts) {
     space.batch([{ type: 'del', key: k, options: opts }], opts, cb)
   }
 
+  function addEncodings(op, prefix) {
+    if (prefix && prefix.options) {
+      op.keyEncoding || (op.keyEncoding = prefix.options.keyEncoding)
+      op.valueEncoding || (op.valueEncoding = prefix.options.valueEncoding)
+    }
+    return op
+  }
+
   //
-  // hook batch method to invoke commit hooks with original keys
+  // hook batch method to invoke commit hooks on original keys
   //
   var _batch = space.batch
-  space.batch = function (array, opts, cb) {
+  space.batch = function (ops, opts, cb) {
     if (!arguments.length)
       return new Batch(space)
 
-    if (prefix.precommit)
-      array = prefix.precommit(array)
+    //
+    // apply precommit hooks
+    //
+    for (var i = 0, len = ops.length; i < len; i++) {
+      var op = ops[i]
 
-    _batch.call(space, array, opts, function (err) {
-      if (prefix.postcommit)
-        err = prefix.postcommit(err, array)
+      function add(op) {
+        if (op === false)
+          return delete ops[i]
+        ops.push(op)
+      }
 
-      cb(err)
+      addEncodings(op, op.prefix)
+
+      //
+      // resolve prefix if an alternative space is referenced
+      //
+      op.prefix || (op.prefix = this)
+      var prefix = prefixes.get(op.prefix)
+      prefix.trigger(prefix.prehooks, [ op, add, ops ])
+    }
+
+    _batch.call(space, ops, opts, function (err) {
+      if (err)
+        return cb(err)
+
+      ops.forEach(function (op) {
+        prefix.trigger(prefix.posthooks, [ op ])
+      })
+      cb()
     })
   }
 
   //
-  // allow subspace to be created without leaking ref to root db
+  // api-compatible with sublevel
   //
-  space.subspace = function (ns, opts_) {
+  space.sublevel = function (ns, opts_) {
     //
-    // subspace inherits options from parent
+    // subspace inherits options from parent space
     //
     return bytespace(db, prefix.append(ns), xtend(opts, opts_))
   }
@@ -90,26 +145,40 @@ function bytespace(db, ns, opts) {
   return space
 }
 
-
+//
+// leveldown pre-batch hook
+//
 function preBatch(array, opts, cb, next) {
   var encoded = []
   var op
   for (var i = 0, length = array.length; i < length; i++) {
     op = encoded[i] = xtend(array[i])
-    op.key = this.encode(op.key)
+
+    //
+    // resolve prefix from db reference
+    //
+    var prefix = prefixes.get(op.prefix)
+    if (!prefix)
+      return cb(new Error('Unknown prefix in batch'))
+
+    op.key = prefix.encode(op.key || this)
     op.keyEncoding = 'binary'
   }
 
   next(encoded, opts, cb)
 }
 
-
+//
+// leveldown pre-get hook
+//
 function preGet(k, opts, cb, next) {
   opts.keyEncoding = 'binary'
   next(this.encode(k), opts, cb)
 }
 
-
+//
+// leveldown pre-get hook
+//
 function postGet(k, opts, err, v, cb, next) {
   next(this.decode(k), opts, err, v, cb)
 }

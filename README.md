@@ -33,17 +33,19 @@ var subDb = testDb.subspace('another')
 
 ## Rooted keypaths
 
-The subspace db instance itself is essentially a keyspace `chroot` -- a jail you cannot escape with just a reference to the subspace. While the subspace must be provided a reference to a backing db to initialize, this capability should not be surfaced on any properties or methods of the subspace. The subspace is confined strictly to its subset of the keyspace.
+The subspace db instance itself is essentially a keyspace `chroot` -- a jail you cannot escape with just a reference to the subspace. While the subspace must be provided a reference to a backing db to initialize, this capability should not be surfaced on any properties or methods of the subspace. The capabilities of a subspace are restricted to the subset of of keyspace allocated to it.
 
 
 ## Nested subspaces
 
-When instantiating a subspace, it will test the provided `db` reference to determine if it's a `bytewise-subspace` instance. If so, it will call the `subspace` method with the provided options to create the new subspace. Rather than running through the encode/decode process mulitple times, the responsibility of encoding and decoding keys is delegated to the root subspace. All keys will be correctly prefixed to the appropriate subspace.
+When instantiating a subspace, it will test the provided `db` reference to determine if it's a `bytewise-subspace` instance. If so, it will call the `sublevel` method with the provided options to create the new subspace. Rather than running through the encode/decode process mulitple times, the responsibility of encoding and decoding keys is delegated to the root subspace. All keys will be correctly prefixed to the appropriate subspace.
+
+The `sublevel` method is API-compatible with [level-sublevel](https://github.com/dominictarr/level-sublevel), though we take an extra `options` argument to allow additional `levelup` db options to be provided.
 
 
 ### Hooks
 
-TODO
+Precommit and postcommit hooks are implemented using the `pre` and `post` methods from [level-sublevel](https://github.com/dominictarr/level-sublevel)'s API. The optional `range` argument is not yet implemented but it is otherwise API-compatible, allowing a `bytespace` instance with libraries expected a `sublevel` instance.
 
 
 ## Encoding

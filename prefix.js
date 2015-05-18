@@ -8,6 +8,8 @@ var equal = require('bytewise-core/util').equal
 function Prefix(path) {
   this.path = path
   this.buffer = bytewise.encode(path)
+  this.prehooks = []
+  this.posthooks = []
 }
 
 Prefix.prototype.append = function (ns) {
@@ -38,6 +40,15 @@ Prefix.prototype.encode = function (k, space) {
     k = new Buffer(k)
 
   return Buffer.concat([ this.buffer, k ])
+}
+
+//
+// loop over hooks and trigger in the context of subspace
+//
+Prefix.prototype.trigger = function(hooks, args) {
+  for (var i = 0, len = hooks.length; i < len; i++) {
+    hooks[i].apply(this.db, args)
+  }
 }
 
 module.exports = Prefix
