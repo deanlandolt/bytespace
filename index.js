@@ -65,7 +65,7 @@ function bytespace(db, ns, opts) {
   // api-compatible with sublevel, extended to allow overloading db options
   //
   space.sublevel = function (ns_, opts_) {
-    return bytespace(db, ns.append(ns_), opts_)
+    return bytespace(db, ns.append(ns_), merge(opts, opts_))
   }
 
   space.clone = function () {
@@ -83,10 +83,10 @@ function bytespace(db, ns, opts) {
     space.batch([{ type: 'del', key: k, options: opts }], opts, cb)
   }
 
-  function addEncodings(op, space) {
-    if (space && space.options) {
-      op.keyEncoding || (op.keyEncoding = space.options.keyEncoding)
-      op.valueEncoding || (op.valueEncoding = space.options.valueEncoding)
+  function addEncodings(op, subspace) {
+    if (subspace && subspace.options) {
+      op.keyEncoding || (op.keyEncoding = subspace.options.keyEncoding)
+      op.valueEncoding || (op.valueEncoding = subspace.options.valueEncoding)
     }
     return op
   }
