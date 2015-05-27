@@ -40,6 +40,18 @@ function bytespace(db, ns, opts) {
   opts = merge(db.options, opts, { db: factory })
   var space = levelup(opts)
   space.namespace = ns
+  ns.codec = db._codec
+
+  //
+  // api-compatible with sublevel, extended to allow overloading db options
+  //
+  space.sublevel = function (ns_, opts_) {
+    return bytespace(db, ns.append(ns_), merge(opts, opts_))
+  }
+
+  space.clone = function () {
+    return bytespace(db, ns, opts)
+  }
 
   //
   // helper to register pre and post commit hooks
@@ -62,24 +74,21 @@ function bytespace(db, ns, opts) {
   }
 
   //
-  // api-compatible with sublevel, extended to allow overloading db options
-  //
-  space.sublevel = function (ns_, opts_) {
-    return bytespace(db, ns.append(ns_), merge(opts, opts_))
-  }
-
-  space.clone = function () {
-    return bytespace(db, ns, opts)
-  }
-
-  //
   // override single-record write operations, redirecting to batch
   //
   space.put = function (k, v, opts, cb) {
+    if (!cb && typeof opts === 'function') {
+      cb = opts
+      opts = {}
+    }
     space.batch([{ type: 'put', key: k, value: v, options: opts }], opts, cb)
   }
 
   space.del = function (k, opts, cb) {
+    if (!cb && typeof opts === 'function') {
+      cb = opts
+      opts = {}
+    }
     space.batch([{ type: 'del', key: k, options: opts }], opts, cb)
   }
 
@@ -98,6 +107,11 @@ function bytespace(db, ns, opts) {
   space.batch = function (ops, opts, cb) {
     if (!arguments.length)
       return new Batch(space)
+
+    if (!cb && typeof opts === 'function') {
+      cb = opts
+      opts = {}
+    }
 
     //
     // apply precommit hooks
@@ -167,7 +181,7 @@ function preGet(k, opts, cb, next) {
 // leveldown post-get hook
 //
 function postGet(k, opts, err, v, cb, next) {
-  next(this.decode(k), opts, err, v, cb)
+  next(this.decode(k), opts, err, this.codec.decodeValue(v, opts), cb)
 }
 
 
@@ -234,13 +248,12 @@ function preIterator(pre) {
     opts.lt = this.encode(UPPER_BOUND)
   }
 
-  var $postNext = postNext.bind(this, keyAsBuffer)
-
+  var ns = this
   function wrappedFactory(opts) {
     var iterator = pre.factory(opts)
 
     iterator.extendWith({
-      postNext: $postNext
+      postNext: postNext.bind(ns, opts, keyAsBuffer)
     })
 
     return iterator
@@ -253,7 +266,7 @@ function preIterator(pre) {
 }
 
 
-function postNext(keyAsBuffer, err, k, v, cb, next) {
+function postNext(opts, keyAsBuffer, err, k, v, cb, next) {
   //
   // pass through errors and null end-of-iterator values
   //
@@ -261,6 +274,7 @@ function postNext(keyAsBuffer, err, k, v, cb, next) {
     return next(err, k, v, cb)
 
   k = this.decode(k)
+  v = this.codec.decodeValue(v, opts)
   next(err, err ? k : keyAsBuffer ? k : k.toString('utf8'), v, cb)
 }
 
