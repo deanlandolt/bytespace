@@ -7,7 +7,7 @@ var Namespace = require('./namespace')
 var updown = require('level-updown')
 
 //
-// create a bytespace given a provided levelup instance
+// create a bytespace given a levelup instance
 //
 function bytespace(db, ns, opts) {
 
@@ -42,15 +42,20 @@ function bytespace(db, ns, opts) {
   space.namespace = ns
   ns.codec = db._codec
 
+  var ctor = opts.factory || bytespace
+
   //
   // api-compatible with sublevel, extended to allow overloading db options
   //
   space.sublevel = function (ns_, opts_) {
-    return bytespace(db, ns.append(ns_), merge(opts, opts_))
+    space.sublevels || (space.sublevels = {})
+    if (space.sublevels[ns_])
+      return space.sublevels[ns_]
+    return space.sublevels[ns_] = ctor(db, ns.append(ns_), merge(opts, opts_))
   }
 
   space.clone = function () {
-    return bytespace(db, ns, opts)
+    return ctor(db, ns, opts)
   }
 
   //
