@@ -1,16 +1,15 @@
 var Batch = require('./batch')
-var bytewise = require('bytewise-core')
 var levelup = require('levelup')
-// var ltgt = require('ltgt')
 var merge = require('xtend')
 var Namespace = require('./namespace')
 var updown = require('level-updown')
 
-//
-// create a bytespace given a levelup instance
-//
-function bytespace(db, ns, opts) {
+module.exports = Bytespace
 
+//
+// create a bytespace within a provided levelup instance
+//
+function Bytespace(db, ns, opts) {
   if (!(ns instanceof Namespace)) {
     //
     // if db is a subspace mount as a nested subspace
@@ -42,8 +41,6 @@ function bytespace(db, ns, opts) {
   space.namespace = ns
   ns.codec = db._codec
 
-  var ctor = opts.factory || bytespace
-
   //
   // api-compatible with sublevel, extended to allow overloading db options
   //
@@ -51,11 +48,11 @@ function bytespace(db, ns, opts) {
     space.sublevels || (space.sublevels = {})
     if (space.sublevels[ns_])
       return space.sublevels[ns_]
-    return space.sublevels[ns_] = ctor(db, ns.append(ns_), merge(opts, opts_))
+    return space.sublevels[ns_] = Bytespace(db, ns.append(ns_), merge(opts, opts_))
   }
 
   space.clone = function () {
-    return ctor(db, ns, opts)
+    return Bytespace(db, ns, opts)
   }
 
   //
@@ -190,75 +187,15 @@ function postGet(k, opts, err, v, cb, next) {
 }
 
 
-var LOWER_BOUND = new Buffer([])
-var UPPER_BOUND = new Buffer([ 0xff ])
-
-var rangeKeys = [ 'start', 'end', 'gt', 'lt', 'gte', 'lte' ]
-
 function preIterator(pre) {
-  var opts = merge(pre.options)
-  var keyAsBuffer = opts.keyAsBuffer
-  opts.keyAsBuffer = true
-
-
-  // TODO: use ltgt rather than this hand-rolled crap
-  var has = {}
-  rangeKeys.forEach(function (k) {
-    has[k] = k in opts
-  })
-
-  // getting a phantom start value -- but from where?
-  if (has.start && (has.gt || has.lt || has.gte || has.lte)) {
-    delete opts.start
-    has.start = false
-  }
-
-  // var lower = this.encode(LOWER_BOUND)
-  // var upper = this.encode(UPPER_BOUND)
-  // ltgt.toLtgt(opts, opts, this.encode.bind(this), lower, upper)
-
-  if (has.start || has.end) {
-    if (!opts.reverse) {
-      opts.gte = has.start ? opts.start : LOWER_BOUND
-      opts.lte = has.end ? opts.end : UPPER_BOUND
-    }
-    else {
-      opts.gte = has.end ? opts.end : LOWER_BOUND
-      opts.lte = has.start ? opts.start : UPPER_BOUND
-    }
-
-    has.gte = has.lte = true
-    delete opts.start
-    delete opts.end
-  }
-
-  if (has.gt) {
-    opts.gt = this.encode(opts.gt)
-    delete opts.gte
-  }
-  else if (has.gte) {
-    opts.gte = this.encode(opts.gte)
-  }
-  else {
-    opts.gt = this.encode(LOWER_BOUND)
-  }
-
-  if (has.lt) {
-    opts.lt = this.encode(opts.lt)
-    delete opts.lte
-  }
-  else if (has.lte)
-    opts.lte = this.encode(opts.lte)
-  else {
-    opts.lt = this.encode(UPPER_BOUND)
-  }
-
   var ns = this
+  var opts = ns.encodeRange(pre.options)
+
   function wrappedFactory(opts) {
     var iterator = pre.factory(opts)
 
     iterator.extendWith({
-      postNext: postNext.bind(ns, opts, keyAsBuffer)
+      postNext: postNext.bind(ns, opts, pre.options)
     })
 
     return iterator
@@ -271,7 +208,7 @@ function preIterator(pre) {
 }
 
 
-function postNext(opts, keyAsBuffer, err, k, v, cb, next) {
+function postNext(opts, preOpts, err, k, v, cb, next) {
   //
   // pass through errors and null end-of-iterator values
   //
@@ -280,12 +217,5 @@ function postNext(opts, keyAsBuffer, err, k, v, cb, next) {
 
   k = this.decode(k)
   v = this.codec.decodeValue(v, opts)
-  next(err, err ? k : keyAsBuffer ? k : k.toString('utf8'), v, cb)
+  next(err, err ? k : preOpts.keyAsBuffer ? k : k.toString('utf8'), v, cb)
 }
-
-//
-// add ref to bytewise encoding as a convenience
-//
-bytespace.bytewise = bytewise
-
-module.exports = bytespace

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 var after = require('after')
+var bytewise = require('bytewise-core')
 var levelup = require('levelup')
 var list = require('list-stream')
 var inspect = require('util').inspect
@@ -9,7 +10,6 @@ var subspace = require('../')
 var test = require('tape')
 var xtend = require('xtend')
 
-var bytewise = subspace.bytewise
 var testDb  = __dirname + '/__bytespace.db'
 
 

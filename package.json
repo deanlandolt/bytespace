@@ -26,9 +26,11 @@
   "homepage": "https://github.com/deanlandolt/bytespace",
   "dependencies": {
     "bytewise-core": "^1.2",
+    "level-codec": "^6.0.0",
     "level-updown": "^2.0.1",
     "levelup": "^1.0.0-5",
     "ltgt": "^2.1.0",
+    "through2": "^0.6.5",
     "xtend": "^4.0.0"
   },
   "devDependencies": {
