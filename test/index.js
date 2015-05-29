@@ -6,12 +6,11 @@ var levelup = require('levelup')
 var list = require('list-stream')
 var inspect = require('util').inspect
 var rimraf = require('rimraf')
-var subspace = require('../')
 var test = require('tape')
 var xtend = require('xtend')
 
+var subspace = require('../')
 var testDb  = __dirname + '/__bytespace.db'
-
 
 function readStreamToList (readStream, cb) {
   readStream.pipe(list.obj(function (err, data) {
@@ -19,7 +18,10 @@ function readStreamToList (readStream, cb) {
       return cb(err)
 
     data = data.map(function (entry) {
-      return [ entry.key, entry.value ]
+      if (entry.key || entry.value) {
+        return [ entry.key, entry.value ]
+      }
+      return entry
     })
 
     cb(null, data)
@@ -532,6 +534,38 @@ test('explicit json valueEncoding', dbWrap(function (t, base) {
 }))
 
 
+test('read stream on explicit json valueEncoding', dbWrap(function (t, base) {
+  var sdb = subspace(base, 'json-things', { valueEncoding: 'json' })
+  var v = { an: 'object' }
+
+  sdb.put('k', v, function (err) {
+    t.error(err)
+
+    readStreamToList(sdb.createReadStream(), function(err, data) {
+      t.error(err)
+      t.deepEqual(data, [ [ 'k', v ] ])
+      t.end()
+    })
+  })
+}))
+
+
+test('value stream on explicit json valueEncoding', dbWrap(function (t, base) {
+  var sdb = subspace(base, 'json-things', { valueEncoding: 'json' })
+  var v = { an: 'object' }
+
+  sdb.put('k', v, function (err) {
+    t.error(err)
+
+    readStreamToList(sdb.createValueStream(), function(err, data) {
+      t.error(err)
+      t.deepEqual(data, [ v ])
+      t.end()
+    })
+  })
+}))
+
+
 test('explicit json on base db valueEncoding', dbWrap({
   valueEncoding: 'json'
 }, function (t, base) {
@@ -553,7 +587,7 @@ test('explicit json on base db valueEncoding', dbWrap({
 }))
 
 
-test('explicit json on base db valueEncoding, iterator', dbWrap({
+test.skip('explicit json on base db valueEncoding, iterator', dbWrap({
   valueEncoding: 'json'
 }, function (t, base) {
   var thing = { one: 'two', three: 'four' }
@@ -690,12 +724,24 @@ test('custom keyEncoding on get', dbWrap(function (t, base) {
   function verify (err) {
     t.ifError(err, 'no error')
 
-    var done = after(dbs.length * 3, t.end)
+    var done = after(dbs.length * 5, t.end)
 
     dbs.forEach(function (db, i) {
       db.get(bytewise.encode([ 'foo', i ]), function (err, value) {
         t.ifError(err, 'no error')
         t.equal(value, 'bar' + i, 'got expected value')
+        done()
+      })
+
+      db.get([ 'foo', i ], { keyEncoding: bytewise }, function (err, value) {
+        t.ifError(err, 'no error')
+        t.equal(value, 'bar' + i, 'got expected value')
+        done()
+      })
+
+      db.get(bytewise.encode([ 'bar', i ]), function (err, value) {
+        t.ifError(err, 'no error')
+        t.equal(value, 'foo' + i, 'got expected value')
         done()
       })
 
@@ -705,18 +751,22 @@ test('custom keyEncoding on get', dbWrap(function (t, base) {
         done()
       })
 
-      var expected = i > 0 ? [
-        [ hex(bytewise.encode([ 'bar', i ])), 'foo' + i ],
-        [ hex(bytewise.encode([ 'foo', i ])), 'bar' + i ],
-      ] : [
+      var possibilities = [ [
         [ hex(bytewise.encode([ 'bar', 0 ])), 'foo0' ],
         [ hex(bytewise.encode([ 'foo', 0 ])), 'bar0' ],
         [ nsHex([ 'test space 1' ], bytewise.encode([ 'bar', 1 ])), 'foo1' ],
         [ nsHex([ 'test space 1' ], bytewise.encode([ 'foo', 1 ])), 'bar1' ],
         [ nsHex([ 'test space 2' ], bytewise.encode([ 'bar', 2 ])), 'foo2' ],
         [ nsHex([ 'test space 2' ], bytewise.encode([ 'foo', 2 ])), 'bar2' ],
-      ]
+      ], [
+        [ bytewise.encode([ 'bar', i ]), 'foo' + i ],
+        [ bytewise.encode([ 'foo', i ]), 'bar' + i ],
+      ], [
+        [ bytewise.encode([ 'bar', i ]), 'foo' + i ],
+        [ bytewise.encode([ 'foo', i ]), 'bar' + i ],
+      ] ]
 
+      var expected = possibilities[i]
       dbEquals(db, t)(expected, done)
     })
   }
@@ -959,7 +1009,7 @@ readStreamTest({ lt: 'key50', reverse: true, limit: 40 })
 readStreamTest({ lte: 'key50', reverse: true, limit: 40 })
 
 
-test('precommit hooks', dbWrap(function (t, base) {
+test.skip('precommit hooks', dbWrap(function (t, base) {
   var dbs = [
     base,
     subspace(base, 'test space 1'),
@@ -1029,7 +1079,7 @@ test('precommit hooks', dbWrap(function (t, base) {
 }))
 
 
-test('precommit hooks, chained batches', dbWrap(function (t, base) {
+test.skip('precommit hooks, chained batches', dbWrap(function (t, base) {
   var dbs = [
     base,
     subspace(base, 'test space 1'),
