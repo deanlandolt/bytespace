@@ -587,7 +587,7 @@ test('explicit json on base db valueEncoding', dbWrap({
 }))
 
 
-test.skip('explicit json on base db valueEncoding, iterator', dbWrap({
+test('explicit json on base db valueEncoding, iterator', dbWrap({
   valueEncoding: 'json'
 }, function (t, base) {
   var thing = { one: 'two', three: 'four' }
