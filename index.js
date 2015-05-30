@@ -39,8 +39,8 @@ function Bytespace(db, ns, opts) {
   var codec = this._codec = new Codec(opts)
   this.namespace = ns
 
-  function encode(k, opts, batchOpts) {
-    return ns.encode(codec.encodeKey(k, opts, batchOpts))
+  function encode(k, opts) {
+    return ns.encode(codec.encodeKey(k, opts))
   }
 
   function decode(k, opts) {
@@ -80,77 +80,132 @@ function Bytespace(db, ns, opts) {
   }
 
   //
-  // method proxy implementations
+  // helper to register pre and post commit hooks
   //
+  function addHook(hooks, hook) {
+    hooks.push(hook)
+    return function () {
+      var i = hooks.indexOf(hook)
+      if (~i)
+        return hooks.splice(i, 1)
+    }
+  }
 
-  function keyOpts(initial) {
+  this.pre = function (hook) {
+    return addHook(ns.prehooks, hook)
+  }
+
+  this.post = function (hook) {
+    return addHook(ns.posthooks, hook)
+  }
+
+  function kOpts(initial) {
     return merge(initial, { keyEncoding: 'binary' })
   }
 
-  function valueOpts(initial) {
+  function vOpts(initial) {
     return merge({ valueEncoding: opts.valueEncoding }, initial)
   }
 
-  function allOpts(initial) {
-    return valueOpts(keyOpts(initial))
+  function kvOpts(initial) {
+    return vOpts(kOpts(initial))
   }
 
+  function addEncodings(op, db) {
+    if (db && db.options) {
+      op.keyEncoding || (op.keyEncoding = db.options.keyEncoding)
+      op.valueEncoding || (op.valueEncoding = db.options.valueEncoding)
+    }
+    return op
+  }
+
+  //
+  // method proxy implementations
+  //
   if (typeof db.get === 'function') {
     this.get = function (k, opts, cb) {
       cb = getCallback(opts, cb)
       opts = getOptions(opts)
+
       k = encode(k, opts)
-      db.get(k, allOpts(opts), cb)
+      db.get(k, kvOpts(opts), cb)
     }
   }
 
   if (typeof db.del === 'function') {
     this.del = function (k, opts, cb) {
-      cb = getCallback(opts, cb)
-      opts = getOptions(opts)
-      k = encode(k, opts)
-      db.del(k, keyOpts(opts), cb)
+      this.batch([{ type: 'del', key: k }], opts, cb)
     }
   }
 
   if (typeof db.put === 'function') {
     this.put = function (k, v, opts, cb) {
-      cb = getCallback(opts, cb)
-      opts = getOptions(opts)
-      k = encode(k, opts)
-      db.put(k, v, allOpts(opts), cb)
+      this.batch([{ type: 'put', key: k, value: v }], opts, cb)
     }
   }
 
   if (typeof db.batch === 'function') {
-    this.batch = function (array, opts, cb) {
-      if (!arguments.length) {
-        //
-        // wrap del and put methods for chained batches
-        //
-        var batch = db.batch()
-
-        var _del = batch.del
-        batch.del = function (k, opts) {
-          return _del.call(batch, encode(k, opts), keyOpts(opts))
-        }
-
-        var _put = batch.put
-        batch.put = function (k, v, opts) {
-          return _put.call(batch, encode(k, opts), v, allOpts(opts))
-        }
-
-        return batch
-      }
+    this.batch = function (ops, opts, cb) {
+      if (!arguments.length)
+        return new Batch(this)
 
       cb = getCallback(opts, cb)
       opts = getOptions(opts)
-      array.map(function (item) {
-        item.key = encode(item.key, opts)
-        return item
+
+      //
+      // encode batch ops and apply precommit hooks
+      //
+      for (var i = 0, len = ops.length; i < len; i++) {
+        var op = ops[i]
+
+        function add(op) {
+          if (op === false)
+            return delete ops[i]
+          ops.push(op)
+        }
+
+        addEncodings(op, op.prefix)
+
+        op.prefix || (op.prefix = this)
+
+        var ns = op.prefix.namespace
+        if (!(ns instanceof Namespace))
+          return cb('Unknown prefix in batch commit')
+
+        ns.trigger(ns.prehooks, op.prefix, [ op, add, ops ])
+
+        //
+        // encode op key, but keep a ref to initial value around for postcommit
+        //
+        var source = op.prefix
+        op.initialKey = op.key
+        op.initialKeyEncoding = op.keyEncoding
+      }
+
+      ops.forEach(function (op) {
+        op.key = source.namespace.encode(source._codec.encodeKey(op.key, opts, op))
+        op.keyEncoding = 'binary'
       })
-      opts.keyEncoding = 'binary'
-      db.batch(array, allOpts(opts), cb)
+
+      if (!ops.length)
+        return cb()
+
+      db.batch(ops, kvOpts(opts), function (err) {
+        if (err)
+          return cb(err)
+
+        //
+        // apply postcommit hooks for ops, setting encoded keys to initial state
+        //
+        ops.forEach(function (op) {
+          op.key = op.initialKey
+          op.keyEncoding = op.initialKeyEncoding
+          var ns = op.prefix.namespace
+          ns.trigger(ns.posthooks, op.prefix, [ op ])
+        })
+
+        cb()
+      })
     }
   }
 
@@ -184,16 +239,15 @@ function Bytespace(db, ns, opts) {
   //
   if (typeof db.createReadStream === 'function') {
     this.createReadStream = this.readStream = function (opts) {
-      return readStream(merge({ keys: true, values: true }, valueOpts(opts)))
+      return readStream(merge({ keys: true, values: true }, vOpts(opts)))
     }
 
     this.createKeyStream = this.keyStream =  function (opts) {
-      var o = merge(valueOpts(opts), { keys: true, values: false })
-      return readStream(merge(valueOpts(opts), { keys: true, values: false }))
+      return readStream(merge(vOpts(opts), { keys: true, values: false }))
     }
 
     this.createValueStream = this.valueStream = function (opts) {
-      return readStream(merge(valueOpts(opts), { keys: false, values: true }))
+      return readStream(merge(vOpts(opts), { keys: false, values: true }))
     }
   }
 
@@ -202,11 +256,10 @@ function Bytespace(db, ns, opts) {
   //
   if (typeof db.createLiveStream === 'function') {
     this.createLiveStream = this.liveStream =  function (opts) {
-      var o = merge(valueOpts(opts), ns.encodeRange(opts))
+      var o = merge(vOpts(opts), ns.encodeRange(opts))
       return db.createLiveStream(o).pipe(streamDecoder(opts))
     }
   }
-
 }
 
 //

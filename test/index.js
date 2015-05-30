@@ -1009,7 +1009,7 @@ readStreamTest({ lt: 'key50', reverse: true, limit: 40 })
 readStreamTest({ lte: 'key50', reverse: true, limit: 40 })
 
 
-test.skip('precommit hooks', dbWrap(function (t, base) {
+test('precommit hooks', dbWrap(function (t, base) {
   var dbs = [
     base,
     subspace(base, 'test space 1'),
@@ -1079,7 +1079,7 @@ test.skip('precommit hooks', dbWrap(function (t, base) {
 }))
 
 
-test.skip('precommit hooks, chained batches', dbWrap(function (t, base) {
+test('precommit hooks, chained batches', dbWrap(function (t, base) {
   var dbs = [
     base,
     subspace(base, 'test space 1'),

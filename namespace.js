@@ -112,6 +112,10 @@ Namespace.prototype.encodeRange = function (range) {
   return opts
 }
 
+Namespace.prototype.hasHooks = function (ns) {
+  return !!(this.prehooks.length || this.posthooks.length)
+}
+
 //
 // loop over hooks and trigger in the context of subspace
 //
