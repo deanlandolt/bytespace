@@ -127,20 +127,41 @@ function Bytespace(db, ns, opts) {
       cb = getCallback(opts, cb)
       opts = getOptions(opts)
 
-      k = encode(k, opts)
-      db.get(k, kvOpts(opts), cb)
+      db.get(encode(k, opts), kvOpts(opts), cb)
     }
   }
 
   if (typeof db.del === 'function') {
     this.del = function (k, opts, cb) {
-      this.batch([{ type: 'del', key: k }], opts, cb)
+      //
+      // redirect to batch if we have hooks
+      //
+      if (ns.hasHooks()) {
+        this.batch([{ type: 'del', key: k }], opts, cb)
+      }
+      else {
+        cb = getCallback(opts, cb)
+        opts = getOptions(opts)
+
+        db.del(encode(k, opts), kOpts(opts), cb)
+      }
     }
   }
 
   if (typeof db.put === 'function') {
     this.put = function (k, v, opts, cb) {
-      this.batch([{ type: 'put', key: k, value: v }], opts, cb)
+      //
+      // redirect to batch if we have hooks
+      //
+      if (ns.hasHooks()) {
+        this.batch([{ type: 'put', key: k, value: v }], opts, cb)
+      }
+      else {
+        cb = getCallback(opts, cb)
+        opts = getOptions(opts)
+
+        db.put(encode(k, opts), v, kvOpts(opts), cb)
+      }
     }
   }
 
@@ -172,18 +193,19 @@ function Bytespace(db, ns, opts) {
         if (!(ns instanceof Namespace))
           return cb('Unknown prefix in batch commit')
 
-        ns.trigger(ns.prehooks, op.prefix, [ op, add, ops ])
+        if (ns.prehooks.length)
+          ns.trigger(ns.prehooks, op.prefix, [ op, add, ops ])
 
         //
         // encode op key, but keep a ref to initial value around for postcommit
         //
-        var source = op.prefix
         op.initialKey = op.key
         op.initialKeyEncoding = op.keyEncoding
       }
 
       ops.forEach(function (op) {
-        op.key = source.namespace.encode(source._codec.encodeKey(op.key, opts, op))
+        var pre = op.prefix
+        op.key = pre.namespace.encode(pre._codec.encodeKey(op.key, opts, op))
         op.keyEncoding = 'binary'
       })
 
@@ -201,7 +223,8 @@ function Bytespace(db, ns, opts) {
           op.key = op.initialKey
           op.keyEncoding = op.initialKeyEncoding
           var ns = op.prefix.namespace
-          ns.trigger(ns.posthooks, op.prefix, [ op ])
+          if (ns.posthooks.length)
+            ns.trigger(ns.posthooks, op.prefix, [ op ])
         })
 
         cb()
