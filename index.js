@@ -1,4 +1,6 @@
 var Codec = require('level-codec')
+var EventEmitter = require('events').EventEmitter
+var inherits = require('util').inherits
 var merge = require('xtend')
 var through = require('through2')
 var util = require('levelup/lib/util')
@@ -51,16 +53,7 @@ function Bytespace(db, ns, opts) {
   //
   // use provided methods manifest in options or get from db
   //
-  this.methods = opts.methods || merge(db.methods)
-
-  //
-  // enumerate provided methods
-  //
-  for (var name in this.methods) {
-    if (typeof db[name] === 'function') {
-      this[name] = db[name].bind(db)
-    }
-  }
+  this.methods = merge(opts.methods || db.methods)
 
   //
   // sublevel api-compatibility
@@ -284,6 +277,8 @@ function Bytespace(db, ns, opts) {
     }
   }
 }
+
+inherits(Bytespace, EventEmitter)
 
 //
 // used to define default options for root subspaces
