@@ -1,11 +1,13 @@
 var bytewise = require('bytewise-core')
+var Codec = require('level-codec')
 var equal = require('bytewise-core/util').equal
 var merge = require('xtend')
 
 //
 // brand namespace instance to keep track of subspace root
 //
-function Namespace(path) {
+function Namespace(path, hex) {
+  this.hex = !!hex
   this.path = path
   this.buffer = bytewise.encode(path)
   this.prehooks = []
@@ -13,31 +15,42 @@ function Namespace(path) {
 }
 
 Namespace.prototype.append = function (ns) {
-  return new Namespace(this.path.concat(ns))
+  return new Namespace(this.path.concat(ns), this.hex)
+}
+
+Namespace.prototype.createCodec = function (opts) {
+  return this.codec = new Codec(opts)
 }
 
 Namespace.prototype.contains = function (k) {
-  //
   // slice to get key prefix
-  //
   return equal(this.buffer, k.slice(0, this.buffer.length))
 }
 
-Namespace.prototype.decode = function (k) {
-  if (!Buffer.isBuffer(k))
+Namespace.prototype.decode = function (k, opts) {
+  if (this.hex) {
+    if (typeof k !== 'string') {
+      throw new TypeError('Key must be encoded as a hex string')
+    }
+
+    k = new Buffer(k, 'hex')
+  }
+
+  else if (!Buffer.isBuffer(k))
     throw new TypeError('Key must be encoded as a buffer')
 
   if (!this.contains(k))
     return k
 
-  //
-  // slice off prefix and return the rest
-  //
-  return k.slice(this.buffer.length)
+  // slice off prefix and run through codec
+  var encoded = k.slice(this.buffer.length)
+  var coerce = this.codec.keyAsBuffer(opts) ? Buffer : String
+  return this.codec.decodeKey(coerce(encoded))
 }
 
-Namespace.prototype.encode = function (k) {
-  return Buffer.concat([ this.buffer, Buffer(k) ])
+Namespace.prototype.encode = function (k, opts, batchOpts) {
+  var encoded = this.codec.encodeKey(k, opts, batchOpts)
+  return Buffer.concat([ this.buffer, new Buffer(encoded) ])
 }
 
 var LOWER_BOUND = new Buffer([])
@@ -46,8 +59,8 @@ var RANGE_KEYS = [ 'gt', 'lt', 'gte', 'lte', 'min', 'max', 'start', 'end' ]
 
 Namespace.prototype.encodeRange = function (range) {
   var opts = merge(range, {
-    keyAsBuffer: true,
-    keyEncoding: 'binary'
+    keyAsBuffer: !this.hex,
+    keyEncoding: this.hex ? 'hex' : 'binary'
   })
 
   // TODO: use ltgt rather than this hand-rolled crap?
