@@ -72,30 +72,6 @@ function Bytespace(db, ns, opts) {
     return new Bytespace(db, ns, opts)
   }
 
-  //
-  // helper to register pre and post commit hooks
-  //
-  function addHook(hooks, hook) {
-    hooks.push(hook)
-    return function () {
-      var i = hooks.indexOf(hook)
-      if (~i)
-        return hooks.splice(i, 1)
-    }
-  }
-
-  this.pre = function (hook) {
-    return addHook(ns.prehooks, hook)
-  }
-
-  this.post = function (hook) {
-    return addHook(ns.posthooks, hook)
-  }
-
-  function kOpts(initial) {
-    return merge(initial, { keyEncoding: 'binary' })
-  }
-
   function vOpts(initial) {
     return merge({ valueEncoding: opts.valueEncoding }, initial)
   }
@@ -155,6 +131,18 @@ function Bytespace(db, ns, opts) {
 
         db.put(encode(k, opts), v, kvOpts(opts), cb)
       }
+    }
+  }
+
+  //
+  // helper to register pre and post commit hooks
+  //
+  function addHook(hooks, hook) {
+    hooks.push(hook)
+    return function () {
+      var i = hooks.indexOf(hook)
+      if (i >= 0)
+        return hooks.splice(i, 1)
     }
   }
 
@@ -222,6 +210,18 @@ function Bytespace(db, ns, opts) {
 
         cb()
       })
+    }
+
+    this.pre = function (hook) {
+      return addHook(ns.prehooks, hook)
+    }
+
+    this.post = function (hook) {
+      return addHook(ns.posthooks, hook)
+    }
+
+    function kOpts(initial) {
+      return merge(initial, { keyEncoding: 'binary' })
     }
   }
 
