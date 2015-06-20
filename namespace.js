@@ -3,11 +3,18 @@ var Codec = require('level-codec')
 var equal = require('bytewise-core/util').equal
 var merge = require('xtend')
 
+
+var LOWER_BOUND = new Buffer([])
+var UPPER_BOUND = new Buffer([ 0xff ])
+var RANGE_KEYS = [ 'gt', 'lt', 'gte', 'lte', 'min', 'max', 'start', 'end' ]
+
 //
 // brand namespace instance to keep track of subspace root
 //
 function Namespace(path, hex) {
   this.hex = !!hex
+  this.keyEncoding = hex ? 'utf8' : 'binary'
+
   this.path = path
   this.buffer = bytewise.encode(path)
   this.prehooks = []
@@ -23,7 +30,7 @@ Namespace.prototype.createCodec = function (opts) {
 }
 
 Namespace.prototype.contains = function (k) {
-  // slice to get key prefix
+  // slice full key to get prefix to compare against buffer
   return equal(this.buffer, k.slice(0, this.buffer.length))
 }
 
@@ -49,18 +56,27 @@ Namespace.prototype.decode = function (k, opts) {
 }
 
 Namespace.prototype.encode = function (k, opts, batchOpts) {
-  var encoded = this.codec.encodeKey(k, opts, batchOpts)
-  return Buffer.concat([ this.buffer, new Buffer(encoded) ])
-}
+  var buffer = this.buffer
 
-var LOWER_BOUND = new Buffer([])
-var UPPER_BOUND = new Buffer([ 0xff ])
-var RANGE_KEYS = [ 'gt', 'lt', 'gte', 'lte', 'min', 'max', 'start', 'end' ]
+  // TODO: this could be a lot more efficient
+  if (k === LOWER_BOUND) {
+    // noop
+  }
+  else if (k === UPPER_BOUND) {
+    buffer = Buffer.concat([ buffer, k ])
+  }
+  else {
+    var encoded = this.codec.encodeKey(k, opts, batchOpts)
+    buffer = Buffer.concat([ buffer, new Buffer(encoded) ])
+  }
+
+  return this.hex ? buffer.toString('hex') : buffer
+}
 
 Namespace.prototype.encodeRange = function (range) {
   var opts = merge(range, {
     keyAsBuffer: !this.hex,
-    keyEncoding: this.hex ? 'hex' : 'binary'
+    keyEncoding: this.keyEncoding
   })
 
   // TODO: use ltgt rather than this hand-rolled crap?

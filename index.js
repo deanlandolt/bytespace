@@ -16,9 +16,8 @@ function getCallback (opts, cb) {
 function getOptions(opts) {
   return merge(util.getOptions(opts))
 }
-//
+
 // create a bytespace within a remote levelup instance
-//
 function Bytespace(db, ns, opts) {
   if (!(this instanceof Bytespace))
     return new Bytespace(db, ns, opts)
@@ -109,6 +108,7 @@ function Bytespace(db, ns, opts) {
       else {
         cb = getCallback(opts, cb)
         opts = getOptions(opts)
+
         db.put(ns.encode(k, opts), v, kvOpts(opts), cb)
       }
     }
@@ -164,7 +164,7 @@ function Bytespace(db, ns, opts) {
         var pre = op.prefix
         // op.key = pre.namespace.encode(pre._codec.encodeKey(op.key, opts, op))
         op.key = pre.namespace.encode(op.key, opts, op)
-        op.keyEncoding = ns.hex ? 'hex' : 'binary'
+        op.keyEncoding = ns.keyEncoding
       })
 
       if (!ops.length)
@@ -196,7 +196,10 @@ function Bytespace(db, ns, opts) {
     }
 
     function kOpts(initial) {
-      return merge(initial, { keyEncoding: this.hex ? 'hex' : 'binary' })
+      return merge(initial, {
+        keyEncoding: ns.keyEncoding,
+        keyAsBuffer: !ns.hex
+      })
     }
   }
 

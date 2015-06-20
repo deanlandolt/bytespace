@@ -53,11 +53,17 @@ function run(dbFactory, hexNamespace, t) {
         t.ifError(err, 'no error')
 
         var hexed = expected.map(function (kv, i) {
-          return [ hex(kv[0]), kv[1] ]
-        })
-
-        data.forEach(function (kv) {
-          kv[0] = hex(kv[0])
+          var d = data[i]
+          var dataKey = d[0]
+          var expectedKey = kv[0]
+          if (typeof expectedKey === 'string') {
+            d[0] = String(dataKey)
+          }
+          else {
+            expectedKey = hex(expectedKey)
+            d[0] = hexNamespace ? String(dataKey) : hex(dataKey)
+          }
+          return [ expectedKey, kv[1] ]
         })
 
         t.deepEqual(data, hexed, 'database contains expected entries')
@@ -118,18 +124,18 @@ function run(dbFactory, hexNamespace, t) {
       t.ifError(err, 'no error')
 
       t.dbEquals([
-        [ 'bar0', 'foo0' ],
-        [ 'foo0', 'bar0' ],
-        [ encodeNs([ 'test space 1' ], 'bar1'), 'foo1' ],
-        [ encodeNs([ 'test space 1' ], 'foo1'), 'bar1' ],
-        [ encodeNs([ 'test space 2' ], 'bar2'), 'foo2' ],
-        [ encodeNs([ 'test space 2' ], 'foo2'), 'bar2' ],
+        [ '.bar0', 'foo0' ],
+        [ '.foo0', 'bar0' ],
+        [ encodeNs([ 'test space 1' ], '.bar1'), 'foo1' ],
+        [ encodeNs([ 'test space 1' ], '.foo1'), 'bar1' ],
+        [ encodeNs([ 'test space 2' ], '.bar2'), 'foo2' ],
+        [ encodeNs([ 'test space 2' ], '.foo2'), 'bar2' ],
       ], t.end)
     }
 
     dbs.forEach(function (db, i) {
-      db.put('foo' + i, 'bar' + i, done)
-      db.put('bar' + i, 'foo' + i, done)
+      db.put('.foo' + i, 'bar' + i, done)
+      db.put('.bar' + i, 'foo' + i, done)
     })
   }))
 
@@ -147,24 +153,24 @@ function run(dbFactory, hexNamespace, t) {
       t.ifError(err, 'no error')
 
       t.dbEquals([
-        [ 'bar0', 'foo0' ],
-        [ 'foo0', 'bar0' ],
-        [ encodeNs([ 'test space 1' ], 'bar1'), 'foo1' ],
-        [ encodeNs([ 'test space 1' ], 'foo1'), 'bar1' ],
-        [ encodeNs([ 'test space 1', 'inner space 1' ], 'bar3'), 'foo3' ],
-        [ encodeNs([ 'test space 1', 'inner space 1' ], 'foo3'), 'bar3' ],
-        [ encodeNs([ 'test space 1', 'inner space 2' ], 'bar4'), 'foo4' ],
-        [ encodeNs([ 'test space 1', 'inner space 2' ], 'foo4'), 'bar4' ],
-        [ encodeNs([ 'test space 2' ], 'bar2'), 'foo2' ],
-        [ encodeNs([ 'test space 2' ], 'foo2'), 'bar2' ],
-        [ encodeNs([ 'test space 2', 'inner space 1' ], 'bar5'), 'foo5' ],
-        [ encodeNs([ 'test space 2', 'inner space 1' ], 'foo5'), 'bar5' ],
+        [ '.bar0', 'foo0' ],
+        [ '.foo0', 'bar0' ],
+        [ encodeNs([ 'test space 1' ], '.bar1'), 'foo1' ],
+        [ encodeNs([ 'test space 1' ], '.foo1'), 'bar1' ],
+        [ encodeNs([ 'test space 1', 'inner space 1' ], '.bar3'), 'foo3' ],
+        [ encodeNs([ 'test space 1', 'inner space 1' ], '.foo3'), 'bar3' ],
+        [ encodeNs([ 'test space 1', 'inner space 2' ], '.bar4'), 'foo4' ],
+        [ encodeNs([ 'test space 1', 'inner space 2' ], '.foo4'), 'bar4' ],
+        [ encodeNs([ 'test space 2' ], '.bar2'), 'foo2' ],
+        [ encodeNs([ 'test space 2' ], '.foo2'), 'bar2' ],
+        [ encodeNs([ 'test space 2', 'inner space 1' ], '.bar5'), 'foo5' ],
+        [ encodeNs([ 'test space 2', 'inner space 1' ], '.foo5'), 'bar5' ],
       ], t.end)
     }
 
     dbs.forEach(function (db, i) {
-      db.put('foo' + i, 'bar' + i, done)
-      db.put('bar' + i, 'foo' + i, done)
+      db.put('.foo' + i, 'bar' + i, done)
+      db.put('.bar' + i, 'foo' + i, done)
     })
   }))
 
@@ -252,7 +258,7 @@ function run(dbFactory, hexNamespace, t) {
       var done = after(dbs.length, verify)
 
       dbs.forEach(function (db, i) {
-        db.del('bar' + i, function (err) {
+        db.del('.bar' + i, function (err) {
           t.ifError(err, 'no error')
           done()
         })
@@ -263,16 +269,16 @@ function run(dbFactory, hexNamespace, t) {
       t.ifError(err, 'no error')
 
       t.dbEquals([
-        [ 'foo0', 'bar0' ],
-        [ encodeNs([ 'test space 1' ], 'foo1'), 'bar1' ],
-        [ encodeNs([ 'test space 2' ], 'foo2'), 'bar2' ],
+        [ '.foo0', 'bar0' ],
+        [ encodeNs([ 'test space 1' ], '.foo1'), 'bar1' ],
+        [ encodeNs([ 'test space 2' ], '.foo2'), 'bar2' ],
       ], t.end)
     }
 
 
     dbs.forEach(function (db, i) {
-      db.put('foo' + i, 'bar' + i, done)
-      db.put('bar' + i, 'foo' + i, done)
+      db.put('.foo' + i, 'bar' + i, done)
+      db.put('.bar' + i, 'foo' + i, done)
     })
   }))
 
@@ -292,7 +298,7 @@ function run(dbFactory, hexNamespace, t) {
       var done = after(dbs.length, verify)
 
       dbs.forEach(function (db, i) {
-        db.del('bar' + i, function (err) {
+        db.del('.bar' + i, function (err) {
           t.ifError(err, 'no error')
           done()
         })
@@ -303,19 +309,19 @@ function run(dbFactory, hexNamespace, t) {
       t.ifError(err, 'no error')
 
       t.dbEquals([
-        [ 'foo0', 'bar0' ],
-        [ encodeNs([ 'test space 1' ], 'foo1'), 'bar1' ],
-        [ encodeNs([ 'test space 1', 'inner space 1' ], 'foo3'), 'bar3' ],
-        [ encodeNs([ 'test space 1', 'inner space 2' ], 'foo4'), 'bar4' ],
-        [ encodeNs([ 'test space 2' ], 'foo2'), 'bar2' ],
-        [ encodeNs([ 'test space 2', 'inner space 1' ], 'foo5'), 'bar5' ],
+        [ '.foo0', 'bar0' ],
+        [ encodeNs([ 'test space 1' ], '.foo1'), 'bar1' ],
+        [ encodeNs([ 'test space 1', 'inner space 1' ], '.foo3'), 'bar3' ],
+        [ encodeNs([ 'test space 1', 'inner space 2' ], '.foo4'), 'bar4' ],
+        [ encodeNs([ 'test space 2' ], '.foo2'), 'bar2' ],
+        [ encodeNs([ 'test space 2', 'inner space 1' ], '.foo5'), 'bar5' ],
       ], t.end)
     }
 
 
     dbs.forEach(function (db, i) {
-      db.put('foo' + i, 'bar' + i, done)
-      db.put('bar' + i, 'foo' + i, done)
+      db.put('.foo' + i, 'bar' + i, done)
+      db.put('.bar' + i, 'foo' + i, done)
     })
   }))
 
@@ -335,9 +341,9 @@ function run(dbFactory, hexNamespace, t) {
 
       dbs.forEach(function (db, i) {
         db.batch([
-          { type: 'put', key: 'boom' + i, value: 'bang' + i },
-          { type: 'del', key: 'bar' + i },
-          { type: 'put', key: 'bang' + i, value: 'boom' + i },
+          { type: 'put', key: '.boom' + i, value: 'bang' + i },
+          { type: 'del', key: '.bar' + i },
+          { type: 'put', key: '.bang' + i, value: 'boom' + i },
         ], function (err) {
           t.ifError(err, 'no error')
           done()
@@ -349,22 +355,22 @@ function run(dbFactory, hexNamespace, t) {
       t.ifError(err, 'no error')
 
       t.dbEquals([
-        [ 'bang0', 'boom0' ],
-        [ 'boom0', 'bang0' ],
-        [ 'foo0', 'bar0' ],
-        [ encodeNs([ 'test space 1' ], 'bang1'), 'boom1' ],
-        [ encodeNs([ 'test space 1' ], 'boom1'), 'bang1' ],
-        [ encodeNs([ 'test space 1' ], 'foo1'), 'bar1' ],
-        [ encodeNs([ 'test space 2' ], 'bang2'), 'boom2' ],
-        [ encodeNs([ 'test space 2' ], 'boom2'), 'bang2' ],
-        [ encodeNs([ 'test space 2' ], 'foo2'), 'bar2' ],
+        [ '.bang0', 'boom0' ],
+        [ '.boom0', 'bang0' ],
+        [ '.foo0', 'bar0' ],
+        [ encodeNs([ 'test space 1' ], '.bang1'), 'boom1' ],
+        [ encodeNs([ 'test space 1' ], '.boom1'), 'bang1' ],
+        [ encodeNs([ 'test space 1' ], '.foo1'), 'bar1' ],
+        [ encodeNs([ 'test space 2' ], '.bang2'), 'boom2' ],
+        [ encodeNs([ 'test space 2' ], '.boom2'), 'bang2' ],
+        [ encodeNs([ 'test space 2' ], '.foo2'), 'bar2' ],
       ], t.end)
     }
 
 
     dbs.forEach(function (db, i) {
-      db.put('foo' + i, 'bar' + i, done)
-      db.put('bar' + i, 'foo' + i, done)
+      db.put('.foo' + i, 'bar' + i, done)
+      db.put('.bar' + i, 'foo' + i, done)
     })
   }))
 
@@ -385,9 +391,9 @@ function run(dbFactory, hexNamespace, t) {
 
       dbs.forEach(function (db, i) {
         db.batch([
-          { type: 'put', key: 'boom' + i, value: 'bang' + i },
-          { type: 'del', key: 'bar' + i },
-          { type: 'put', key: 'bang' + i, value: 'boom' + i },
+          { type: 'put', key: '.boom' + i, value: 'bang' + i },
+          { type: 'del', key: '.bar' + i },
+          { type: 'put', key: '.bang' + i, value: 'boom' + i },
         ], function (err) {
           t.ifError(err, 'no error')
           done()
@@ -399,31 +405,31 @@ function run(dbFactory, hexNamespace, t) {
       t.ifError(err, 'no error')
 
       t.dbEquals([
-        [ 'bang0', 'boom0' ],
-        [ 'boom0', 'bang0' ],
-        [ 'foo0', 'bar0' ],
-        [ encodeNs([ 'test space 1' ], 'bang1'), 'boom1' ],
-        [ encodeNs([ 'test space 1' ], 'boom1'), 'bang1' ],
-        [ encodeNs([ 'test space 1' ], 'foo1'), 'bar1' ],
-        [ encodeNs([ 'test space 1', 'inner space 1' ], 'bang3'), 'boom3' ],
-        [ encodeNs([ 'test space 1', 'inner space 1' ], 'boom3'), 'bang3' ],
-        [ encodeNs([ 'test space 1', 'inner space 1' ], 'foo3'), 'bar3' ],
-        [ encodeNs([ 'test space 1', 'inner space 2' ], 'bang4'), 'boom4' ],
-        [ encodeNs([ 'test space 1', 'inner space 2' ], 'boom4'), 'bang4' ],
-        [ encodeNs([ 'test space 1', 'inner space 2' ], 'foo4'), 'bar4' ],
-        [ encodeNs([ 'test space 2' ], 'bang2'), 'boom2' ],
-        [ encodeNs([ 'test space 2' ], 'boom2'), 'bang2' ],
-        [ encodeNs([ 'test space 2' ], 'foo2'), 'bar2' ],
-        [ encodeNs([ 'test space 2', 'inner space 1' ], 'bang5'), 'boom5' ],
-        [ encodeNs([ 'test space 2', 'inner space 1' ], 'boom5'), 'bang5' ],
-        [ encodeNs([ 'test space 2', 'inner space 1' ], 'foo5'), 'bar5' ],
+        [ '.bang0', 'boom0' ],
+        [ '.boom0', 'bang0' ],
+        [ '.foo0', 'bar0' ],
+        [ encodeNs([ 'test space 1' ], '.bang1'), 'boom1' ],
+        [ encodeNs([ 'test space 1' ], '.boom1'), 'bang1' ],
+        [ encodeNs([ 'test space 1' ], '.foo1'), 'bar1' ],
+        [ encodeNs([ 'test space 1', 'inner space 1' ], '.bang3'), 'boom3' ],
+        [ encodeNs([ 'test space 1', 'inner space 1' ], '.boom3'), 'bang3' ],
+        [ encodeNs([ 'test space 1', 'inner space 1' ], '.foo3'), 'bar3' ],
+        [ encodeNs([ 'test space 1', 'inner space 2' ], '.bang4'), 'boom4' ],
+        [ encodeNs([ 'test space 1', 'inner space 2' ], '.boom4'), 'bang4' ],
+        [ encodeNs([ 'test space 1', 'inner space 2' ], '.foo4'), 'bar4' ],
+        [ encodeNs([ 'test space 2' ], '.bang2'), 'boom2' ],
+        [ encodeNs([ 'test space 2' ], '.boom2'), 'bang2' ],
+        [ encodeNs([ 'test space 2' ], '.foo2'), 'bar2' ],
+        [ encodeNs([ 'test space 2', 'inner space 1' ], '.bang5'), 'boom5' ],
+        [ encodeNs([ 'test space 2', 'inner space 1' ], '.boom5'), 'bang5' ],
+        [ encodeNs([ 'test space 2', 'inner space 1' ], '.foo5'), 'bar5' ],
       ], t.end)
     }
 
 
     dbs.forEach(function (db, i) {
-      db.put('foo' + i, 'bar' + i, done)
-      db.put('bar' + i, 'foo' + i, done)
+      db.put('.foo' + i, 'bar' + i, done)
+      db.put('.bar' + i, 'foo' + i, done)
     })
   }))
 
@@ -443,9 +449,9 @@ function run(dbFactory, hexNamespace, t) {
 
       dbs.forEach(function (db, i) {
         db.batch()
-          .put('boom' + i, 'bang' + i)
-          .del('bar' + i)
-          .put('bang' + i, 'boom' + i)
+          .put('.boom' + i, 'bang' + i)
+          .del('.bar' + i)
+          .put('.bang' + i, 'boom' + i)
           .write(function (err) {
             t.ifError(err, 'no error')
             done()
@@ -457,22 +463,22 @@ function run(dbFactory, hexNamespace, t) {
       t.ifError(err, 'no error')
 
       t.dbEquals([
-        [ 'bang0', 'boom0' ],
-        [ 'boom0', 'bang0' ],
-        [ 'foo0', 'bar0' ],
-        [ encodeNs([ 'test space 1' ], 'bang1'), 'boom1' ],
-        [ encodeNs([ 'test space 1' ], 'boom1'), 'bang1' ],
-        [ encodeNs([ 'test space 1' ], 'foo1'), 'bar1' ],
-        [ encodeNs([ 'test space 2' ], 'bang2'), 'boom2' ],
-        [ encodeNs([ 'test space 2' ], 'boom2'), 'bang2' ],
-        [ encodeNs([ 'test space 2' ], 'foo2'), 'bar2' ],
+        [ '.bang0', 'boom0' ],
+        [ '.boom0', 'bang0' ],
+        [ '.foo0', 'bar0' ],
+        [ encodeNs([ 'test space 1' ], '.bang1'), 'boom1' ],
+        [ encodeNs([ 'test space 1' ], '.boom1'), 'bang1' ],
+        [ encodeNs([ 'test space 1' ], '.foo1'), 'bar1' ],
+        [ encodeNs([ 'test space 2' ], '.bang2'), 'boom2' ],
+        [ encodeNs([ 'test space 2' ], '.boom2'), 'bang2' ],
+        [ encodeNs([ 'test space 2' ], '.foo2'), 'bar2' ],
       ], t.end)
     }
 
 
     dbs.forEach(function (db, i) {
-      db.put('foo' + i, 'bar' + i, done)
-      db.put('bar' + i, 'foo' + i, done)
+      db.put('.foo' + i, 'bar' + i, done)
+      db.put('.bar' + i, 'foo' + i, done)
     })
   }))
 
@@ -493,9 +499,9 @@ function run(dbFactory, hexNamespace, t) {
 
       dbs.forEach(function (db, i) {
         db.batch()
-          .put('boom' + i, 'bang' + i)
-          .del('bar' + i)
-          .put('bang' + i, 'boom' + i)
+          .put('.boom' + i, 'bang' + i)
+          .del('.bar' + i)
+          .put('.bang' + i, 'boom' + i)
           .write(function (err) {
             t.ifError(err, 'no error')
             done()
@@ -507,31 +513,31 @@ function run(dbFactory, hexNamespace, t) {
       t.ifError(err, 'no error')
 
       t.dbEquals([
-        [ 'bang0', 'boom0' ],
-        [ 'boom0', 'bang0' ],
-        [ 'foo0', 'bar0' ],
-        [ encodeNs([ 'test space 1' ], 'bang1'), 'boom1' ],
-        [ encodeNs([ 'test space 1' ], 'boom1'), 'bang1' ],
-        [ encodeNs([ 'test space 1' ], 'foo1'), 'bar1' ],
-        [ encodeNs([ 'test space 1', 'inner space 1' ], 'bang3'), 'boom3' ],
-        [ encodeNs([ 'test space 1', 'inner space 1' ], 'boom3'), 'bang3' ],
-        [ encodeNs([ 'test space 1', 'inner space 1' ], 'foo3'), 'bar3' ],
-        [ encodeNs([ 'test space 1', 'inner space 2' ], 'bang4'), 'boom4' ],
-        [ encodeNs([ 'test space 1', 'inner space 2' ], 'boom4'), 'bang4' ],
-        [ encodeNs([ 'test space 1', 'inner space 2' ], 'foo4'), 'bar4' ],
-        [ encodeNs([ 'test space 2' ], 'bang2'), 'boom2' ],
-        [ encodeNs([ 'test space 2' ], 'boom2'), 'bang2' ],
-        [ encodeNs([ 'test space 2' ], 'foo2'), 'bar2' ],
-        [ encodeNs([ 'test space 2', 'inner space 1' ], 'bang5'), 'boom5' ],
-        [ encodeNs([ 'test space 2', 'inner space 1' ], 'boom5'), 'bang5' ],
-        [ encodeNs([ 'test space 2', 'inner space 1' ], 'foo5'), 'bar5' ],
+        [ '.bang0', 'boom0' ],
+        [ '.boom0', 'bang0' ],
+        [ '.foo0', 'bar0' ],
+        [ encodeNs([ 'test space 1' ], '.bang1'), 'boom1' ],
+        [ encodeNs([ 'test space 1' ], '.boom1'), 'bang1' ],
+        [ encodeNs([ 'test space 1' ], '.foo1'), 'bar1' ],
+        [ encodeNs([ 'test space 1', 'inner space 1' ], '.bang3'), 'boom3' ],
+        [ encodeNs([ 'test space 1', 'inner space 1' ], '.boom3'), 'bang3' ],
+        [ encodeNs([ 'test space 1', 'inner space 1' ], '.foo3'), 'bar3' ],
+        [ encodeNs([ 'test space 1', 'inner space 2' ], '.bang4'), 'boom4' ],
+        [ encodeNs([ 'test space 1', 'inner space 2' ], '.boom4'), 'bang4' ],
+        [ encodeNs([ 'test space 1', 'inner space 2' ], '.foo4'), 'bar4' ],
+        [ encodeNs([ 'test space 2' ], '.bang2'), 'boom2' ],
+        [ encodeNs([ 'test space 2' ], '.boom2'), 'bang2' ],
+        [ encodeNs([ 'test space 2' ], '.foo2'), 'bar2' ],
+        [ encodeNs([ 'test space 2', 'inner space 1' ], '.bang5'), 'boom5' ],
+        [ encodeNs([ 'test space 2', 'inner space 1' ], '.boom5'), 'bang5' ],
+        [ encodeNs([ 'test space 2', 'inner space 1' ], '.foo5'), 'bar5' ],
       ], t.end)
     }
 
 
     dbs.forEach(function (db, i) {
-      db.put('foo' + i, 'bar' + i, done)
-      db.put('bar' + i, 'foo' + i, done)
+      db.put('.foo' + i, 'bar' + i, done)
+      db.put('.bar' + i, 'foo' + i, done)
     })
   }))
 
@@ -643,7 +649,8 @@ function run(dbFactory, hexNamespace, t) {
     sdb.put('thing', thing, function (err) {
       t.error(err)
 
-      base.get(encodeNs([ 'json-things' ], 'thing'), {
+      var key = encodeNs([ 'json-things' ], 'thing')
+      base.get(hexNamespace ? hex(key) : key, {
         valueEncoding: 'utf8'
       }, function (err, value) {
         t.error(err)
@@ -664,7 +671,8 @@ function run(dbFactory, hexNamespace, t) {
     }, function (err) {
       t.error(err)
 
-      base.get(encodeNs([ 'json-things' ], 'thing'), {
+      var key = encodeNs([ 'json-things' ], 'thing')
+      base.get(hexNamespace ? hex(key) : key, {
         valueEncoding: 'utf8'
       }, function (err, value) {
         t.error(err)
@@ -735,6 +743,10 @@ function run(dbFactory, hexNamespace, t) {
 
 
   t.test('custom keyEncoding on get', dbWrap(function (t, base) {
+    // skip get tests for hex mode
+    if (hexNamespace) {
+      return t.end()
+    }
     var dbs = [
       base,
       subspace(base, 'test space 1'),
@@ -748,43 +760,44 @@ function run(dbFactory, hexNamespace, t) {
       var done = after(dbs.length * 5, t.end)
 
       dbs.forEach(function (db, i) {
-        db.get(encode([ 'foo', i ]), function (err, value) {
+
+        db.get(encode([ '.foo', i ]), function (err, value) {
           t.ifError(err, 'no error')
           t.equal(value, 'bar' + i, 'got expected value')
           done()
         })
 
-        db.get([ 'foo', i ], { keyEncoding: bytewise }, function (err, value) {
+        db.get([ '.foo', i ], { keyEncoding: bytewise }, function (err, value) {
           t.ifError(err, 'no error')
           t.equal(value, 'bar' + i, 'got expected value')
           done()
         })
 
-        db.get(encode([ 'bar', i ]), function (err, value) {
+        db.get(encode([ '.bar', i ]), function (err, value) {
           t.ifError(err, 'no error')
           t.equal(value, 'foo' + i, 'got expected value')
           done()
         })
 
-        db.get([ 'bar', i ], { keyEncoding: bytewise }, function (err, value) {
+        db.get([ '.bar', i ], { keyEncoding: bytewise }, function (err, value) {
           t.ifError(err, 'no error')
           t.equal(value, 'foo' + i, 'got expected value')
           done()
         })
 
         var possibilities = [ [
-          [ encode([ 'bar', 0 ]), 'foo0', true ],
-          [ encode([ 'foo', 0 ]), 'bar0', true ],
-          [ encodeNs([ 'test space 1' ], encode([ 'bar', 1 ])), 'foo1' ],
-          [ encodeNs([ 'test space 1' ], encode([ 'foo', 1 ])), 'bar1' ],
-          [ encodeNs([ 'test space 2' ], encode([ 'bar', 2 ])), 'foo2' ],
-          [ encodeNs([ 'test space 2' ], encode([ 'foo', 2 ])), 'bar2' ],
+          [ encode([ '.bar', 0 ]), 'foo0' ],
+          [ encode([ '.foo', 0 ]), 'bar0' ],
+          [ encodeNs([ 'test space 1' ], encode([ '.bar', 1 ])), 'foo1' ],
+          [ encodeNs([ 'test space 1' ], encode([ '.foo', 1 ])), 'bar1' ],
+          [ encodeNs([ 'test space 2' ], encode([ '.bar', 2 ])), 'foo2' ],
+          [ encodeNs([ 'test space 2' ], encode([ '.foo', 2 ])), 'bar2' ],
         ], [
-          [ encode([ 'bar', i ]), 'foo' + i, true ],
-          [ encode([ 'foo', i ]), 'bar' + i, true ],
+          [ encode([ '.bar', i ]), 'foo' + i ],
+          [ encode([ '.foo', i ]), 'bar' + i ],
         ], [
-          [ encode([ 'bar', i ]), 'foo' + i, true ],
-          [ encode([ 'foo', i ]), 'bar' + i, true ],
+          [ encode([ '.bar', i ]), 'foo' + i ],
+          [ encode([ '.foo', i ]), 'bar' + i ],
         ] ]
 
         var expected = possibilities[i]
@@ -793,8 +806,8 @@ function run(dbFactory, hexNamespace, t) {
     }
 
     dbs.forEach(function (db, i) {
-      db.put(encode([ 'foo', i ]), 'bar' + i, done)
-      db.put(encode([ 'bar', i ]), 'foo' + i, { keyEncoding: 'binary' }, done)
+      db.put(encode([ '.foo', i ]), 'bar' + i, done)
+      db.put(encode([ '.bar', i ]), 'foo' + i, { keyEncoding: 'binary' }, done)
     })
   }))
 
@@ -811,18 +824,29 @@ function run(dbFactory, hexNamespace, t) {
       t.ifError(err, 'no error')
 
       t.dbEquals([
-        [ encode([ 'bar', 0 ]), 'foo0', true],
-        [ encode([ 'foo', 0 ]), 'bar0', true ],
-        [ encodeNs([ 'test space 1' ], encode([ 'bar', 1 ])), 'foo1' ],
-        [ encodeNs([ 'test space 1' ], encode([ 'foo', 1 ])), 'bar1' ],
-        [ encodeNs([ 'test space 2' ], encode([ 'bar', 2 ])), 'foo2' ],
-        [ encodeNs([ 'test space 2' ], encode([ 'foo', 2 ])), 'bar2' ],
+        [ encode([ '.bar', 0 ]), 'foo0'],
+        [ encode([ '.foo', 0 ]), 'bar0' ],
+        [ encodeNs([ 'test space 1' ], encode([ '.bar', 1 ])), 'foo1' ],
+        [ encodeNs([ 'test space 1' ], encode([ '.foo', 1 ])), 'bar1' ],
+        [ encodeNs([ 'test space 2' ], encode([ '.bar', 2 ])), 'foo2' ],
+        [ encodeNs([ 'test space 2' ], encode([ '.foo', 2 ])), 'bar2' ],
       ], t.end)
     }
 
     dbs.forEach(function (db, i) {
-      db.put(encode([ 'foo', i ]), 'bar' + i, done)
-      db.put([ 'bar', i ], 'foo' + i, { keyEncoding: bytewise }, done)
+      var k0 = encode([ '.foo', i ])
+      var k1 = [ '.bar', i ]
+      var opts1 = { keyEncoding: bytewise }
+
+      // special treatment for base level keys in hex tests
+      if (!i && hexNamespace) {
+        k0 = hex(k0)
+        k1 = hex(encode(k1))
+        opts1.keyEncoding = 'utf8'
+      }
+
+      db.put(k0, 'bar' + i, done)
+      db.put(k1, 'foo' + i, opts1, done)
     })
   }))
 
@@ -833,24 +857,36 @@ function run(dbFactory, hexNamespace, t) {
       subspace(base, 'test space 1'),
       subspace(base, 'test space 2', { keyEncoding: bytewise }),
     ]
+
     var done = after(dbs.length * 2, verify)
 
     function verify (err) {
       t.ifError(err, 'no error')
 
       t.dbEquals([
-        [ 'bar,0', 'foo0' ],
-        [ encode([ 'foo', 0 ]), 'bar0', true ],
-        [ encodeNs([ 'test space 1' ], 'bar,1'), 'foo1' ],
-        [ encodeNs([ 'test space 1' ], encode([ 'foo', 1 ])), 'bar1' ],
-        [ encodeNs([ 'test space 2' ], encode(encode([ 'foo', 2 ]))), 'bar2' ],
-        [ encodeNs([ 'test space 2' ], encode([ 'bar', 2 ])), 'foo2' ],
+        [ '.bar,0', 'foo0' ],
+        [ encode([ '.foo', 0 ]), 'bar0' ],
+        [ encodeNs([ 'test space 1' ], '.bar,1'), 'foo1' ],
+        [ encodeNs([ 'test space 1' ], encode([ '.foo', 1 ])), 'bar1' ],
+        [ encodeNs([ 'test space 2' ], encode(encode([ '.foo', 2 ]))), 'bar2' ],
+        [ encodeNs([ 'test space 2' ], encode([ '.bar', 2 ])), 'foo2' ],
       ], t.end)
     }
 
     dbs.forEach(function (db, i) {
-      db.put(encode([ 'foo', i ]), 'bar' + i, done)
-      db.put([ 'bar', i ], 'foo' + i, done)
+      var opts = {}
+      var k0 = encode([ '.foo', i ])
+      var k1 = [ '.bar', i ]
+
+      // special treatment for base level keys in hex tests
+      if (!i && hexNamespace) {
+        opts.keyEncoding = 'utf8'
+        k0 = hex(k0)
+        k1 = String(k1)
+      }
+
+      db.put(k0, 'bar' + i, opts, done)
+      db.put(k1, 'foo' + i, opts, done)
     })
   }))
 
@@ -1064,9 +1100,9 @@ function run(dbFactory, hexNamespace, t) {
 
       dbs.forEach(function (db, i) {
         db.batch([
-          { type: 'put', key: 'boom' + i, value: 'bang' + i },
-          { type: 'del', key: 'bar' + i },
-          { type: 'put', key: 'bang' + i, value: 'boom' + i },
+          { type: 'put', key: '.boom' + i, value: 'bang' + i },
+          { type: 'del', key: '.bar' + i },
+          { type: 'put', key: '.bang' + i, value: 'boom' + i },
         ], done)
       })
     }
@@ -1077,24 +1113,24 @@ function run(dbFactory, hexNamespace, t) {
       t.deepEqual(calls, [ 0, 5, 5 ])
 
       t.dbEquals([
-        [ 'bang0', 'boom0' ],
-        [ 'boom0', 'bang0' ],
-        [ 'foo0', 'bar0' ],
-        [ encodeNs([ 'test space 1' ], 'BANG1'), 'boom1' ],
-        [ encodeNs([ 'test space 1' ], 'BOOM1'), 'bang1' ],
-        [ encodeNs([ 'test space 1' ], 'FOO1'), 'bar1' ],
-        [ encodeNs([ 'test space 2' ], 'bang2'), 'boom2' ],
-        [ encodeNs([ 'test space 2' ], 'bang2 xxx'), 'boom2' ],
-        [ encodeNs([ 'test space 2' ], 'boom2'), 'bang2' ],
-        [ encodeNs([ 'test space 2' ], 'boom2 xxx'), 'bang2' ],
-        [ encodeNs([ 'test space 2' ], 'foo2'), 'bar2' ],
-        [ encodeNs([ 'test space 2' ], 'foo2 xxx'), 'bar2' ],
+        [ '.bang0', 'boom0' ],
+        [ '.boom0', 'bang0' ],
+        [ '.foo0', 'bar0' ],
+        [ encodeNs([ 'test space 1' ], '.BANG1'), 'boom1' ],
+        [ encodeNs([ 'test space 1' ], '.BOOM1'), 'bang1' ],
+        [ encodeNs([ 'test space 1' ], '.FOO1'), 'bar1' ],
+        [ encodeNs([ 'test space 2' ], '.bang2'), 'boom2' ],
+        [ encodeNs([ 'test space 2' ], '.bang2 xxx'), 'boom2' ],
+        [ encodeNs([ 'test space 2' ], '.boom2'), 'bang2' ],
+        [ encodeNs([ 'test space 2' ], '.boom2 xxx'), 'bang2' ],
+        [ encodeNs([ 'test space 2' ], '.foo2'), 'bar2' ],
+        [ encodeNs([ 'test space 2' ], '.foo2 xxx'), 'bar2' ],
       ], t.end)
     }
 
     dbs.forEach(function (db, i) {
-      db.put('foo' + i, 'bar' + i, done)
-      db.put('bar' + i, 'foo' + i, done)
+      db.put('.foo' + i, 'bar' + i, done)
+      db.put('.bar' + i, 'foo' + i, done)
     })
 
   }))
@@ -1134,9 +1170,9 @@ function run(dbFactory, hexNamespace, t) {
 
       dbs.forEach(function (db, i) {
         db.batch()
-          .put('boom' + i, 'bang' + i)
-          .del('bar' + i)
-          .put('bang' + i, 'boom' + i)
+          .put('.boom' + i, 'bang' + i)
+          .del('.bar' + i)
+          .put('.bang' + i, 'boom' + i)
           .write(function (err) {
             t.ifError(err, 'no error')
             done()
@@ -1150,24 +1186,24 @@ function run(dbFactory, hexNamespace, t) {
       t.deepEqual(calls, [ 0, 5, 5 ])
 
       t.dbEquals([
-        [ 'bang0', 'boom0' ],
-        [ 'boom0', 'bang0' ],
-        [ 'foo0', 'bar0' ],
-        [ encodeNs([ 'test space 1' ], 'BANG1'), 'boom1' ],
-        [ encodeNs([ 'test space 1' ], 'BOOM1'), 'bang1' ],
-        [ encodeNs([ 'test space 1' ], 'FOO1'), 'bar1' ],
-        [ encodeNs([ 'test space 2' ], 'bang2'), 'boom2' ],
-        [ encodeNs([ 'test space 2' ], 'bang2 xxx'), 'boom2' ],
-        [ encodeNs([ 'test space 2' ], 'boom2'), 'bang2' ],
-        [ encodeNs([ 'test space 2' ], 'boom2 xxx'), 'bang2' ],
-        [ encodeNs([ 'test space 2' ], 'foo2'), 'bar2' ],
-        [ encodeNs([ 'test space 2' ], 'foo2 xxx'), 'bar2' ],
+        [ '.bang0', 'boom0' ],
+        [ '.boom0', 'bang0' ],
+        [ '.foo0', 'bar0' ],
+        [ encodeNs([ 'test space 1' ], '.BANG1'), 'boom1' ],
+        [ encodeNs([ 'test space 1' ], '.BOOM1'), 'bang1' ],
+        [ encodeNs([ 'test space 1' ], '.FOO1'), 'bar1' ],
+        [ encodeNs([ 'test space 2' ], '.bang2'), 'boom2' ],
+        [ encodeNs([ 'test space 2' ], '.bang2 xxx'), 'boom2' ],
+        [ encodeNs([ 'test space 2' ], '.boom2'), 'bang2' ],
+        [ encodeNs([ 'test space 2' ], '.boom2 xxx'), 'bang2' ],
+        [ encodeNs([ 'test space 2' ], '.foo2'), 'bar2' ],
+        [ encodeNs([ 'test space 2' ], '.foo2 xxx'), 'bar2' ],
       ], t.end)
     }
 
     dbs.forEach(function (db, i) {
-      db.put('foo' + i, 'bar' + i, done)
-      db.put('bar' + i, 'foo' + i, done)
+      db.put('.foo' + i, 'bar' + i, done)
+      db.put('.bar' + i, 'foo' + i, done)
     })
 
   }))
