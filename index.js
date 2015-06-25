@@ -1,7 +1,7 @@
 var EventEmitter = require('events').EventEmitter
 var inherits = require('util').inherits
 var merge = require('xtend')
-var through = require('through2')
+var Transform = require('stream').Transform
 var util = require('levelup/lib/util')
 
 var Batch = require('./batch')
@@ -70,9 +70,7 @@ function Bytespace(db, ns, opts) {
     return op
   }
 
-  //
   // method proxy implementations
-  //
   if (typeof db.get === 'function') {
     this.get = function (k, opts, cb) {
       cb = getCallback(opts, cb)
@@ -114,9 +112,7 @@ function Bytespace(db, ns, opts) {
     }
   }
 
-  //
   // helper to register pre and post commit hooks
-  //
   function addHook(hooks, hook) {
     hooks.push(hook)
     return function () {
@@ -203,11 +199,11 @@ function Bytespace(db, ns, opts) {
     }
   }
 
-  //
   // transform stream to decode data keys
-  //
-  function streamDecoder(opts) {
-    return through.obj(function (data, enc, cb) {
+  function decodeStream(opts) {
+    var stream = Transform({ objectMode: true })
+
+    stream._transform = function (data, _, cb) {
       try {
         if (opts.keys && opts.values) {
           data.key = ns.decode(data.key, opts)
@@ -219,18 +215,17 @@ function Bytespace(db, ns, opts) {
       catch (err) {
         return cb(err)
       }
-
       cb(null, data)
-    })
+    }
+
+    return stream
   }
 
   function readStream(opts) {
-    return db.createReadStream(ns.encodeRange(opts)).pipe(streamDecoder(opts))
+    return db.createReadStream(ns.encodeRange(opts)).pipe(decodeStream(opts))
   }
 
-  //
-  // add read stream proxy methods if createReadStream is avaialble
-  //
+  // add read stream proxy methods if createReadStream is available
   if (typeof db.createReadStream === 'function') {
     this.createReadStream = this.readStream = function (opts) {
       return readStream(merge({ keys: true, values: true }, vOpts(opts)))
@@ -245,9 +240,7 @@ function Bytespace(db, ns, opts) {
     }
   }
 
-  //
   // add createLiveStream proxy if available
-  //
   if (typeof db.createLiveStream === 'function') {
     this.createLiveStream = this.liveStream =  function (opts) {
       var o = merge(vOpts(opts), ns.encodeRange(opts))
@@ -258,9 +251,7 @@ function Bytespace(db, ns, opts) {
 
 inherits(Bytespace, EventEmitter)
 
-//
 // used to define default options for root subspaces
-//
 Bytespace.options = {
   keyEncoding: util.defaultOptions.keyEncoding,
   valueEncoding: util.defaultOptions.valueEncoding
