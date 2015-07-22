@@ -41,13 +41,13 @@ function Bytespace(db, ns, opts) {
 
   // for sublevel api-compatibility
   this.sublevel = function (ns_, opts_) {
-    var subs = this.sublevels || (this.sublevels = {})
+    var index = this.sublevels || (this.sublevels = {})
 
     // memoize the sublevels we create
-    if (subs[ns_])
-      return subs[ns_]
+    // TODO: memoize with bytewise-encoded hex string instead
+    if (index[ns_]) return index[ns_]
 
-    return subs[ns_] = new Bytespace(db, ns.append(ns_), merge(opts, opts_))
+    return index[ns_] = new Bytespace(db, ns.append(ns_), merge(opts, opts_))
   }
 
   this.clone = function () {
@@ -244,7 +244,7 @@ function Bytespace(db, ns, opts) {
   if (typeof db.createLiveStream === 'function') {
     this.createLiveStream = this.liveStream =  function (opts) {
       var o = merge(vOpts(opts), ns.encodeRange(opts))
-      return db.createLiveStream(o).pipe(streamDecoder(opts))
+      return db.createLiveStream(o).pipe(decodeStream(opts))
     }
   }
 }
