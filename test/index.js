@@ -6,20 +6,78 @@ var encode = bytewise.encode
 var levelup = require('levelup')
 var list = require('list-stream')
 var inspect = require('util').inspect
+var memdb = require('memdb')
 var rimraf = require('rimraf')
 var test = require('tape')
 var extend = require('xtend')
 
 var bytespace = require('../')
-var testDb  = __dirname + '/__bytespace.db'
+var dbPath = __dirname + '/__bytespace.db'
+var multilevel = require('multilevel/test/util').getDb
 
 
+// test('memdb, buffer namespaces', run.bind(null, memdb, false))
+test('memdb, hex namespaces', run.bind(null, memdb, true))
 test('levelup, buffer namespaces', run.bind(null, levelup, false))
 test('levelup, hex namespaces', run.bind(null, levelup, true))
-// test('multilevel, buffer namespaces', run.bind(null, ..., false))
-// test('multilevel, hex namespaces', run.bind(null, ..., true))
+// test('multilevel, buffer namespaces', run.bind(null, multilevel, false))
+// test('multilevel, hex namespaces', run.bind(null, multilevel, true))
 
 function run(dbFactory, hexNamespace, t) {
+
+  var dbWrap = dbFactory === memdb ? memWrap : levelWrap
+
+
+  function memWrap(dbOpts, testFn) {
+    if (typeof dbOpts === 'function') {
+      testFn = dbOpts
+      dbOpts = undefined
+    }
+
+    var base = dbFactory(dbOpts)
+    return function (t) {
+      t.$end = t.end
+      t.end = function (err) {
+        if (err !== undefined)
+          t.ifError(err, 'no error')
+
+        base.close()
+        t.$end()
+      }
+      t.dbEquals = dbEquals(base, t)
+
+      testFn(t, base)
+    }
+  }
+
+  function levelWrap(dbOpts, testFn) {
+    if (typeof dbOpts === 'function') {
+      testFn = dbOpts
+      dbOpts = undefined
+    }
+
+    return function (t) {
+      rimraf.sync(dbPath)
+      dbFactory(dbPath, dbOpts, function (err, base) {
+        t.ifError(err, 'no error')
+
+        t.$end = t.end
+        t.end = function (err) {
+          if (err !== undefined)
+            t.ifError(err, 'no error')
+
+          base.close(function (err) {
+            t.ifError(err, 'no error')
+            rimraf.sync(dbPath)
+            t.$end()
+          })
+        }
+        t.dbEquals = dbEquals(base, t)
+
+        testFn(t, base)
+      })
+    }
+  }
 
   function subspace(db, ns, opts) {
     if (hexNamespace) {
@@ -68,35 +126,6 @@ function run(dbFactory, hexNamespace, t) {
 
         t.deepEqual(data, hexed, 'database contains expected entries')
         cb()
-      })
-    }
-  }
-
-  function dbWrap(dbOpts, testFn) {
-    if (typeof dbOpts === 'function') {
-      testFn = dbOpts
-      dbOpts = undefined
-    }
-
-    return function (t) {
-      rimraf.sync(testDb)
-      levelup(testDb, dbOpts, function (err, base) {
-        t.ifError(err, 'no error')
-
-        t.$end = t.end
-        t.end = function (err) {
-          if (err !== undefined)
-            t.ifError(err, 'no error')
-
-          base.close(function (err) {
-            t.ifError(err, 'no error')
-            rimraf.sync(testDb)
-            t.$end()
-          })
-        }
-        t.dbEquals = dbEquals(base, t)
-
-        testFn(t, base)
       })
     }
   }
@@ -893,9 +922,9 @@ function run(dbFactory, hexNamespace, t) {
 
   function readStreamTest(options) {
     t.test('test readStream with ' + inspect(options), function (t) {
-      var ref1Db = levelup(testDb + '.ref')
-      var ref2Db = levelup(testDb + '.ref2')
-      var base = levelup(testDb)
+      var ref1Db = dbFactory(dbPath + '.ref')
+      var ref2Db = dbFactory(dbPath + '.ref2')
+      var base = dbFactory(dbPath)
       var sdb1 = subspace(base, 'test space')
       var sdb2 = subspace(sdb1, 'inner space ')
       var ref1List
@@ -972,9 +1001,9 @@ function run(dbFactory, hexNamespace, t) {
       function verify () {
         var done = after(3, function (err) {
           t.ifError(err, 'no error')
-          rimraf.sync(testDb)
-          rimraf.sync(testDb + '.ref')
-          rimraf.sync(testDb + '.ref2')
+          rimraf.sync(dbPath)
+          rimraf.sync(dbPath + '.ref')
+          rimraf.sync(dbPath + '.ref2')
           t.end()
         })
 

@@ -35,7 +35,9 @@
     "faucet": "0.0.1",
     "leveldown": "^1.0.6",
     "list-stream": "^1.0.0",
+    "memdb": "^1.0.1",
     "memdown": "^1.0.0",
+    "multilevel": "^6.1.0",
     "rimraf": "^2.3.3",
     "tape": "^4.0.0"
   }
