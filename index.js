@@ -156,11 +156,22 @@ function Bytespace(db, ns, opts) {
         op._initialKeyEncoding = op.keyEncoding
       }
 
+      var prefixes = []
       ops.forEach(function (op) {
         var pre = op.prefix
-        // op.key = pre.namespace.encode(pre._codec.encodeKey(op.key, opts, op))
         op.key = pre.namespace.encode(op.key, opts, op)
         op.keyEncoding = ns.keyEncoding
+
+        // assign a unique id to each prefix used in batch to revive
+        op.prefix = null
+        var prefixId = prefixes.indexOf(pre)
+        if (prefixId >= 0) {
+          op._prefixId = prefixId
+        }
+        else {
+          op._prefixId = prefixes.length
+          prefixes.push(pre)
+        }
       })
 
       if (!ops.length)
@@ -174,9 +185,12 @@ function Bytespace(db, ns, opts) {
         ops.forEach(function (op) {
           op.key = op._initialKey
           op.keyEncoding = op._initialKeyEncoding
+
+          // revive prefix from index
+          var pre = op.prefix = prefixes[op._prefixId]
           var ns = op.prefix.namespace
           if (ns.posthooks.length)
-            ns.trigger(ns.posthooks, op.prefix, [ op ])
+            ns.trigger(ns.posthooks, pre, [ op ])
         })
 
         cb()
