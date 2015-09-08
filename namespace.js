@@ -46,6 +46,7 @@ Namespace.prototype.decode = function (k, opts) {
   else if (!Buffer.isBuffer(k))
     throw new TypeError('Key must be encoded as a buffer')
 
+  // TODO: throw?
   if (!this.contains(k))
     return k
 
