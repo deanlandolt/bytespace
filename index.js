@@ -96,8 +96,7 @@ function Bytespace(db, ns, opts) {
     hooks.push(hook)
     return function () {
       var i = hooks.indexOf(hook)
-      if (i >= 0)
-        return hooks.splice(i, 1)
+      if (i >= 0) return hooks.splice(i, 1)
     }
   }
 
@@ -114,8 +113,7 @@ function Bytespace(db, ns, opts) {
     }
 
     space.batch = function (ops, opts, cb) {
-      if (!arguments.length)
-        return new Batch(space)
+      if (!arguments.length) return new Batch(space)
 
       try {
         cb = getCallback(opts, cb)
@@ -126,8 +124,9 @@ function Bytespace(db, ns, opts) {
           var op = ops[i]
 
           function add(op) {
-            if (op === false)
+            if (op === false) {
               return delete ops[i]
+            }
             ops.push(op)
           }
 
@@ -139,52 +138,41 @@ function Bytespace(db, ns, opts) {
           if (!(ns instanceof Namespace))
             return cb('Unknown prefix in batch commit')
 
-          if (ns.prehooks.length)
+          if (ns.prehooks.length) {
             ns.trigger(ns.prehooks, op.prefix, [ op, add, ops ])
-
-          // encode op key, but keep a ref to initial value around for postcommit
-          op._initialKey = op.key
-          op._initialKeyEncoding = op.keyEncoding
+          }
         }
 
-        var prefixes = []
-        ops.forEach(function (op) {
-          var pre = op.prefix
-          op.key = pre.namespace.encode(op.key, opts, op)
-          op.keyEncoding = pre.namespace.keyEncoding
+        if (!ops.length) return cb()
 
-          // assign a unique id to each prefix used in batch to revive
-          op.prefix = null
-          var prefixId = prefixes.indexOf(pre)
-          if (prefixId >= 0) {
-            op._prefixId = prefixId
-          }
-          else {
-            op._prefixId = prefixes.length
-            prefixes.push(pre)
+        var encodedOps = ops.map(function (op) {
+          return {
+            type: op.type,
+            key: op.prefix.namespace.encode(op.key, opts, op),
+            keyEncoding: ns.keyEncoding,
+            value: op.value,
+            // TODO: multilevel json serialization issue?
+            valueEncoding: op.valueEncoding,
+            sync: op.sync
           }
         })
 
-        if (!ops.length)
-          return cb()
-
-        db.batch(ops, kvOpts(opts), function (err) {
-          if (err)
-            return cb(err)
+        db.batch(encodedOps, kvOpts(opts), function (err) {
+          if (err) return cb(err)
 
           // apply postcommit hooks for ops, setting encoded keys to initial state
-          ops.forEach(function (op) {
-            op.key = op._initialKey
-            op.keyEncoding = op._initialKeyEncoding
+          try {
+            if (ns.posthooks.length) {
+              ops.forEach(function (op) {
+                ns.trigger(ns.posthooks, op.prefix, [ op ])
+              })
+            }
 
-            // revive prefix from index
-            var pre = op.prefix = prefixes[op._prefixId]
-            var ns = op.prefix.namespace
-            if (ns.posthooks.length)
-              ns.trigger(ns.posthooks, pre, [ op ])
-          })
-
-          cb()
+            cb()
+          }
+          catch (err) {
+            cb(err)
+          }
         })
       }
       catch (err) {
