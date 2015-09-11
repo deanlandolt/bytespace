@@ -56,8 +56,6 @@ Since `bytespace` is mostly just a set of `levelup` method wrappers this allows 
 
 Precommit and postcommit hooks are implemented using the `pre` and `post` methods from [level-sublevel](https://github.com/dominictarr/level-sublevel)'s API. The optional `range` argument is not yet implemented but it is otherwise API-compatible, allowing a `bytespace` instance with libraries expected a `sublevel` instance.
 
-NOTE: hooks are not yet implemented for multilevel-backed subspaces.
-
 
 ## Encoding
 
