@@ -44,6 +44,7 @@ function Bytespace(db, ns, opts) {
   // forward `open` and `close` events from base db
   var events = [ 'open', 'close' ]
   events.forEach(function (event) {
+    db.setMaxListeners(db.getMaxListeners() + 2)
     db.on(event, space.emit.bind(space, event))
   })
 
