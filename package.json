@@ -1,6 +1,6 @@
 {
   "name": "bytespace",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "description": "Efficient keypath subspaces prefixed with bytewise tuples",
   "main": "index.js",
   "scripts": {
