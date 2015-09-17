@@ -41,6 +41,20 @@ function Bytespace(db, ns, opts) {
   // use provided methods manifest in options or get from db
   space.methods = merge(opts.methods || db.methods)
 
+  // forward `open` and `close` events from base db
+  var events = [ 'open', 'close' ]
+  events.forEach(function (event) {
+    db.on(event, space.emit.bind(space, event))
+  })
+
+  // proxy `isOpen` to underlying db
+  space.isOpen = function () {
+    return db.isOpen()
+  }
+
+  // set multilevel `isClient` boolean
+  space.isClient = !!db.isClient
+
   // for sublevel api-compatibility
   space.sublevel = function (ns_, opts_) {
     var index = space.sublevels || (space.sublevels = {})
