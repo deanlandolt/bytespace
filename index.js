@@ -17,6 +17,16 @@ function getOptions(opts) {
   return merge(util.getOptions(opts))
 }
 
+function getMaxListeners(emitter) {
+  if (typeof emitter.getMaxListeners === 'function')
+    return emitter.getMaxListeners()
+
+  if (emitter._maxListeners === undefined)
+    return EventEmitter.defaultMaxListeners
+
+  return emitter._maxListeners
+}
+
 // create a bytespace within a remote levelup instance
 function Bytespace(db, ns, opts) {
   if (!(this instanceof Bytespace))
@@ -44,7 +54,7 @@ function Bytespace(db, ns, opts) {
   // forward `open` and `close` events from base db
   var events = [ 'open', 'close' ]
   events.forEach(function (event) {
-    db.setMaxListeners(db.getMaxListeners() + 2)
+    db.setMaxListeners(getMaxListeners(db) + 2)
     db.on(event, space.emit.bind(space, event))
   })
 
