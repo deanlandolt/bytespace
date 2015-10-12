@@ -247,6 +247,7 @@ function Bytespace(db, ns, opts) {
 
   // transform stream to decode data keys
   function decodeStream(opts) {
+    opts || (opts = {})
     var stream = Transform({ objectMode: true })
 
     stream._transform = function (data, _, cb) {
