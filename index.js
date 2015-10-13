@@ -108,7 +108,11 @@ function Bytespace(db, ns, opts) {
       opts = getOptions(opts)
 
       try {
-        db.get(ns.encode(k, opts), kvOpts(opts), cb)
+        db.get(ns.encode(k, opts), kvOpts(opts), function (err, v) {
+          // sanitize full keypath for notFound errors
+          if (err && err.notFound) err.message = 'Key not found in database'
+          cb(err, v)
+        })
       }
       catch (err) {
         process.nextTick(function () { cb(err) })
