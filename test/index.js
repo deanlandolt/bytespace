@@ -215,7 +215,7 @@ function run(dbFactory, hexNamespace, t) {
     function verify (err) {
       t.ifError(err, 'no error')
 
-      var done = after(dbs.length * 2, t.end)
+      var done = after(dbs.length * 3, t.end)
 
       dbs.forEach(function (db, i) {
         db.get('foo' + i, function (err, value) {
@@ -226,6 +226,14 @@ function run(dbFactory, hexNamespace, t) {
         db.get('bar' + i, function (err, value) {
           t.ifError(err, 'no error')
           t.equal(value, 'foo' + i, 'got expected value')
+          done()
+        })
+        db.get('baz' + i, function (err, value) {
+          t.equal(err && err.notFound, true, 'notFound')
+          t.equal(value, undefined)
+          if (db !== base) {
+            t.equal(err && err.message, 'Key not found in database', 'message')
+          }
           done()
         })
       })

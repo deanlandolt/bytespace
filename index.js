@@ -1,11 +1,15 @@
+'use strict'
+
 var EventEmitter = require('events').EventEmitter
 var inherits = require('util').inherits
 var merge = require('xtend')
+var NotFoundError = require('level-errors').NotFoundError
 var Transform = require('stream').Transform
 var util = require('levelup/lib/util')
 
 var Batch = require('./batch')
 var Namespace = require('./namespace')
+var NOT_FOUND = /notfound/i
 
 module.exports = Bytespace
 
@@ -110,7 +114,10 @@ function Bytespace(db, ns, opts) {
       try {
         db.get(ns.encode(k, opts), kvOpts(opts), function (err, v) {
           // sanitize full keypath for notFound errors
-          if (err && err.notFound) err.message = 'Key not found in database'
+          if (err && (err.notFound || NOT_FOUND.test(err))) {
+            err = new NotFoundError('Key not found in database', err)
+          }
+
           cb(err, v)
         })
       }
