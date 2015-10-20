@@ -55,6 +55,12 @@ function Bytespace(db, ns, opts) {
   // use provided methods manifest in options or get from db
   space.methods = merge(opts.methods || db.methods)
 
+  // sublevel@6-compatible-ish
+  Object.defineProperty(db, 'version', {
+    value: 6,
+    configurable: true
+  })
+
   // forward `open` and `close` events from base db
   var events = [ 'open', 'close' ]
   events.forEach(function (event) {
