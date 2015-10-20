@@ -203,12 +203,12 @@ function Bytespace(db, ns, opts) {
                 ns.trigger(ns.posthooks, op.prefix, [ op ])
               })
             }
-
-            cb()
           }
           catch (err) {
             cb(err)
           }
+
+          cb()
         })
       }
       catch (err) {
