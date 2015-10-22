@@ -165,13 +165,6 @@ function Bytespace(db, ns, opts) {
         for (var i = 0, len = ops.length; i < len; i++) {
           var op = ops[i]
 
-          function add(op) {
-            if (op === false) {
-              return delete ops[i]
-            }
-            ops.push(op)
-          }
-
           addEncodings(op, op.prefix)
 
           op.prefix || (op.prefix = space)
