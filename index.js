@@ -157,10 +157,17 @@ function Bytespace(db, ns, opts) {
     space.batch = function (ops, opts, cb) {
       if (!arguments.length) return new Batch(space)
 
-      try {
-        cb = getCallback(opts, cb)
-        opts = getOptions(opts)
+      cb = getCallback(opts, cb)
+      opts = getOptions(opts)
 
+      function add(op) {    
+        if (op === false) {    
+          return delete ops[i]   
+        }    
+        ops.push(op)   
+      }
+
+      try {
         // encode batch ops and apply precommit hooks
         for (var i = 0, len = ops.length; i < len; i++) {
           var op = ops[i]
