@@ -21,16 +21,6 @@ function getOptions(opts) {
   return merge(util.getOptions(opts))
 }
 
-function getMaxListeners(emitter) {
-  if (typeof emitter.getMaxListeners === 'function')
-    return emitter.getMaxListeners()
-
-  if (emitter._maxListeners === undefined)
-    return EventEmitter.defaultMaxListeners
-
-  return emitter._maxListeners
-}
-
 // create a bytespace within a remote levelup instance
 function Bytespace(db, ns, opts) {
   if (!(this instanceof Bytespace))
@@ -61,12 +51,21 @@ function Bytespace(db, ns, opts) {
     configurable: true
   })
 
-  // forward `open` and `close` events from base db
-  var events = [ 'open', 'close' ]
-  events.forEach(function (event) {
-    db.setMaxListeners(getMaxListeners(db) + 2)
-    db.on(event, space.emit.bind(space, event))
-  })
+  // forward open and close events from base db w/o affecting listener count
+  // TODO: levelup emits closed, multilevel emits close...damn...
+  function forwardOpen() {
+    db.once('open', function () {
+      space.emit('open', space)
+      forwardOpen()
+    })
+  }
+
+  function forwardClose() {
+    db.once('close', function () {
+      space.emit('close')
+      forwardClose()
+    })
+  }
 
   // proxy `isOpen` to underlying db
   space.isOpen = function () {
