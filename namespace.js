@@ -1,7 +1,7 @@
 var bytewise = require('bytewise-core')
 var Codec = require('level-codec')
 var equal = require('bytewise-core/util').equal
-var merge = require('xtend')
+var xtend = require('xtend')
 
 
 var LOWER_BOUND = new Buffer([])
@@ -75,7 +75,7 @@ Namespace.prototype.encode = function (k, opts, batchOpts) {
 }
 
 Namespace.prototype.encodeRange = function (range) {
-  var opts = merge(range, {
+  var opts = xtend(range, {
     keyAsBuffer: !this.hex,
     keyEncoding: this.keyEncoding
   })

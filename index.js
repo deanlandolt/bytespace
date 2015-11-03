@@ -2,10 +2,9 @@
 
 var EventEmitter = require('events').EventEmitter
 var inherits = require('util').inherits
-var merge = require('xtend')
 var NotFoundError = require('level-errors').NotFoundError
 var Transform = require('stream').Transform
-var util = require('levelup/lib/util')
+var xtend = require('xtend')
 
 var Batch = require('./batch')
 var Namespace = require('./namespace')
@@ -17,8 +16,13 @@ function getCallback (opts, cb) {
   return typeof opts == 'function' ? opts : cb
 }
 
-function getOptions(opts) {
-  return merge(util.getOptions(opts))
+// from https://github.com/Level/levelup/blob/master/lib/util.js
+function getOptions (options) {
+  if (typeof options == 'string')
+    return { valueEncoding: options }
+  if (typeof options != 'object')
+    return {}
+  return xtend(options)
 }
 
 // create a bytespace within a remote levelup instance
@@ -39,11 +43,11 @@ function Bytespace(db, ns, opts) {
   var space = this
 
   space.namespace = ns
-  opts = space.options = merge(Bytespace.options, db.options, opts)
+  opts = space.options = xtend(Bytespace.options, db.options, opts)
   ns.createCodec(opts)
 
   // use provided methods manifest in options or get from db
-  space.methods = merge(opts.methods || db.methods)
+  space.methods = xtend(opts.methods || db.methods)
 
   // sublevel@6-compatible-ish
   Object.defineProperty(db, 'version', {
@@ -83,7 +87,7 @@ function Bytespace(db, ns, opts) {
     // TODO: memoize with bytewise-encoded hex string instead
     if (index[ns_]) return index[ns_]
 
-    return index[ns_] = new Bytespace(db, ns.append(ns_), merge(opts, opts_))
+    return index[ns_] = new Bytespace(db, ns.append(ns_), xtend(opts, opts_))
   }
 
   space.clone = function () {
@@ -91,11 +95,11 @@ function Bytespace(db, ns, opts) {
   }
 
   function kOpts(initial) {
-    return merge(initial, { keyEncoding: ns.keyEncoding, keyAsBuffer: !ns.hex })
+    return xtend(initial, { keyEncoding: ns.keyEncoding, keyAsBuffer: !ns.hex })
   }
 
   function vOpts(initial) {
-    return merge({ valueEncoding: opts.valueEncoding }, initial)
+    return xtend({ valueEncoding: opts.valueEncoding }, initial)
   }
 
   function kvOpts(initial) {
@@ -296,21 +300,21 @@ function Bytespace(db, ns, opts) {
 
   if (typeof db.createReadStream === 'function') {
     space.createReadStream = space.readStream = function (opts) {
-      return readStream(merge({ keys: true, values: true }, vOpts(opts)))
+      return readStream(xtend({ keys: true, values: true }, vOpts(opts)))
     }
     if (db.readStream) space.readStream = space.createReadStream
   }
 
   if (typeof db.createKeyStream === 'function') {
     space.createKeyStream = function (opts) {
-      return readStream(merge(vOpts(opts), { keys: true, values: false }))
+      return readStream(xtend(vOpts(opts), { keys: true, values: false }))
     }
     if (db.keyStream) space.keyStream = space.createKeyStream
   }
 
   if (typeof db.createValueStream === 'function') {
     space.createValueStream = function (opts) {
-      return readStream(merge(vOpts(opts), { keys: false, values: true }))
+      return readStream(xtend(vOpts(opts), { keys: false, values: true }))
     }
     if (db.valueStream) space.valueStream = space.createValueStream
   }
@@ -318,7 +322,7 @@ function Bytespace(db, ns, opts) {
   // add createLiveStream proxy if available
   if (typeof db.createLiveStream === 'function') {
     space.createLiveStream = function (opts) {
-      var o = merge(vOpts(opts), ns.encodeRange(opts))
+      var o = xtend(vOpts(opts), ns.encodeRange(opts))
       return db.createLiveStream(o).pipe(decodeStream(opts))
     }
     if (db.liveStream) space.liveStream = space.createLiveStream
@@ -327,8 +331,8 @@ function Bytespace(db, ns, opts) {
 
 inherits(Bytespace, EventEmitter)
 
-// used to define default options for root subspaces
+// default options for root subspace db (from levelup/lib/util.js)
 Bytespace.options = {
-  keyEncoding: util.defaultOptions.keyEncoding,
-  valueEncoding: util.defaultOptions.valueEncoding
+  keyEncoding: 'utf8',
+  valueEncoding: 'utf8'
 }

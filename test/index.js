@@ -9,7 +9,7 @@ var inspect = require('util').inspect
 var memdb = require('memdb')
 var rimraf = require('rimraf')
 var test = require('tape')
-var extend = require('xtend')
+var xtend = require('xtend')
 
 var bytespace = require('../')
 var dbPath = __dirname + '/__bytespace.db'
@@ -81,7 +81,7 @@ function run(dbFactory, hexNamespace, t) {
 
   function subspace(db, ns, opts) {
     if (hexNamespace) {
-      opts = extend({ hexNamespace: true }, opts)
+      opts = xtend({ hexNamespace: true }, opts)
     }
 
     return bytespace(db, ns, opts)
@@ -1122,7 +1122,7 @@ function run(dbFactory, hexNamespace, t) {
     dbs[2].pre(function (op, add, ops) {
       t.equal(typeof op.key, 'string')
       calls[2]++
-      op = extend(op)
+      op = xtend(op)
       op.key += ' xxx'
       add(op)
     })
@@ -1192,7 +1192,7 @@ function run(dbFactory, hexNamespace, t) {
     dbs[2].pre(function (op, add, ops) {
       t.equal(typeof op.key, 'string')
       calls[2]++
-      op = extend(op)
+      op = xtend(op)
       op.key += ' xxx'
       add(op)
     })

@@ -28,17 +28,17 @@
     "bytewise-core": "^1.2.3",
     "level-codec": "^6.0.0",
     "level-errors": "^1.0.4",
-    "levelup": "^1.0.0-5",
     "xtend": "^4.0.0"
   },
   "devDependencies": {
     "after": "^0.8.1",
-    "faucet": "0.0.1",
+    "faucet": "^0.0.1",
     "leveldown": "^1.0.6",
+    "levelup": "^1.2.1",
     "list-stream": "^1.0.0",
     "memdb": "^1.0.1",
     "memdown": "^1.0.0",
-    "multilevel": "^7.2.0",
+    "multilevel": "^7.2.1",
     "rimraf": "^2.3.3",
     "tape": "^4.0.0"
   }
