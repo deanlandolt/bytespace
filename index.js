@@ -1,5 +1,6 @@
 'use strict'
 
+var Codec = require('level-codec')
 var EventEmitter = require('events').EventEmitter
 var inherits = require('util').inherits
 var NotFoundError = require('level-errors').NotFoundError
@@ -26,6 +27,7 @@ function getOptions (options) {
 }
 
 // create a bytespace within a remote levelup instance
+// TODO: remove ns from signature to align w/ sublevel
 function Bytespace(db, ns, opts) {
   if (!(this instanceof Bytespace))
     return new Bytespace(db, ns, opts)
@@ -44,9 +46,10 @@ function Bytespace(db, ns, opts) {
 
   space.namespace = ns
   opts = space.options = xtend(Bytespace.options, db.options, opts)
-  ns.createCodec(opts)
+  ns.codec = new Codec(opts)
 
   // use provided methods manifest in options or get from db
+  // TODO: can we remove this?
   space.methods = xtend(opts.methods || db.methods)
 
   // sublevel@6-compatible-ish

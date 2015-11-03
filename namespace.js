@@ -1,16 +1,14 @@
+'use strict'
+
 var bytewise = require('bytewise-core')
-var Codec = require('level-codec')
 var equal = require('bytewise-core/util').equal
 var xtend = require('xtend')
-
 
 var LOWER_BOUND = new Buffer([])
 var UPPER_BOUND = new Buffer([ 0xff ])
 var RANGE_KEYS = [ 'gt', 'lt', 'gte', 'lte', 'min', 'max', 'start', 'end' ]
 
-//
 // brand namespace instance to keep track of subspace root
-//
 function Namespace(path, hex) {
   this.hex = !!hex
   this.keyEncoding = hex ? 'utf8' : 'binary'
@@ -146,9 +144,7 @@ Namespace.prototype.hasHooks = function (ns) {
   return !!(this.prehooks.length || this.posthooks.length)
 }
 
-//
 // loop over hooks and trigger in the context of subspace
-//
 Namespace.prototype.trigger = function(hooks, space, args) {
   for (var i = 0, len = hooks.length; i < len; i++) {
     hooks[i].apply(space, args)
