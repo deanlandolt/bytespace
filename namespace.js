@@ -23,10 +23,6 @@ Namespace.prototype.append = function (ns) {
   return new Namespace(this.path.concat(ns), this.hex)
 }
 
-Namespace.prototype.createCodec = function (opts) {
-  return this.codec = new Codec(opts)
-}
-
 Namespace.prototype.contains = function (k) {
   // slice full key to get prefix to compare against buffer
   return equal(this.buffer, k.slice(0, this.buffer.length))
