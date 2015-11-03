@@ -136,7 +136,7 @@ function Bytespace(db, ns, opts) {
         })
       }
       catch (err) {
-        process.nextTick(function () { cb(err) })
+        process.nextTick(cb.bind(null, err))
       }
     }
   }
@@ -226,7 +226,7 @@ function Bytespace(db, ns, opts) {
         })
       }
       catch (err) {
-        process.nextTick(function () { cb(err) })
+        process.nextTick(cb.bind(null, err))
       }
     }
 
@@ -250,7 +250,7 @@ function Bytespace(db, ns, opts) {
           db.del(ns.encode(k, opts), kOpts(opts), cb)
         }
         catch (err) {
-          process.nextTick(function () { cb(err) })
+          process.nextTick(cb.bind(null, err))
         }
       }
     }
@@ -264,7 +264,7 @@ function Bytespace(db, ns, opts) {
           db.put(ns.encode(k, opts), v, kvOpts(opts), cb)
         }
         catch (err) {
-          process.nextTick(function () { cb(err) })
+          process.nextTick(cb.bind(null, err))
         }
       }
     }

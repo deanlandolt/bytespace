@@ -6,59 +6,52 @@ var encode = bytewise.encode
 var levelup = require('levelup')
 var list = require('list-stream')
 var inspect = require('util').inspect
-var memdb = require('memdb')
+var memdown = require('memdown')
 var rimraf = require('rimraf')
 var test = require('tape')
 var xtend = require('xtend')
 
 var bytespace = require('../')
-var dbPath = __dirname + '/__bytespace.db'
-var multilevel = require('multilevel/test/util').getDb
+var DB_PATH = __dirname + '/__bytespace.db'
 
 
-// test('memdb, buffer namespaces', run.bind(null, memdb, false))
-test('memdb, hex namespaces', run.bind(null, memdb, true))
 test('levelup, buffer namespaces', run.bind(null, levelup, false))
 test('levelup, hex namespaces', run.bind(null, levelup, true))
+// test('memdown, buffer namespaces', run.bind(null, memup, false))
+// test('memdown, hex namespaces', run.bind(null, memup, true))
 // test('multilevel, buffer namespaces', run.bind(null, multilevel, false))
 // test('multilevel, hex namespaces', run.bind(null, multilevel, true))
 
-function run(dbFactory, hexNamespace, t) {
-
-  var dbWrap = dbFactory === memdb ? memWrap : levelWrap
-
-
-  function memWrap(dbOpts, testFn) {
-    if (typeof dbOpts === 'function') {
-      testFn = dbOpts
-      dbOpts = undefined
-    }
-
-    var base = dbFactory(dbOpts)
-    return function (t) {
-      t.$end = t.end
-      t.end = function (err) {
-        if (err !== undefined)
-          t.ifError(err, 'no error')
-
-        base.close()
-        t.$end()
-      }
-      t.dbEquals = dbEquals(base, t)
-
-      testFn(t, base)
-    }
+function memup(opts, fn) {
+  if (typeof opts === 'function') {
+    fn = opts
+    opts = {}
+  }
+  if (typeof opts == 'string') opts = {}
+  opts || (opts = {})
+  opts.db = function () {
+    return new memdown((Math.random()+'').slice(2))
   }
 
-  function levelWrap(dbOpts, testFn) {
+  return levelup('', opts, fn)
+}
+
+function run(dbFactory, hexNamespace, t) {
+
+  function drop(path) {
+    if (dbFactory === memup) return
+    rimraf.sync(path)
+  }
+
+  function dbWrap(dbOpts, testFn) {
     if (typeof dbOpts === 'function') {
       testFn = dbOpts
-      dbOpts = undefined
+      dbOpts = {}
     }
 
     return function (t) {
-      rimraf.sync(dbPath)
-      dbFactory(dbPath, dbOpts, function (err, base) {
+      drop(DB_PATH)
+      levelup(DB_PATH, dbOpts, function (err, base) {
         t.ifError(err, 'no error')
 
         t.$end = t.end
@@ -68,7 +61,7 @@ function run(dbFactory, hexNamespace, t) {
 
           base.close(function (err) {
             t.ifError(err, 'no error')
-            rimraf.sync(dbPath)
+            drop(DB_PATH)
             t.$end()
           })
         }
@@ -109,6 +102,8 @@ function run(dbFactory, hexNamespace, t) {
         keyEncoding: 'binary'
       }), function (err, data) {
         t.ifError(err, 'no error')
+
+        t.equal(data.length, expected.length, 'expected length')
 
         var hexed = expected.map(function (kv, i) {
           var d = data[i]
@@ -930,11 +925,11 @@ function run(dbFactory, hexNamespace, t) {
 
   function readStreamTest(options) {
     t.test('test readStream with ' + inspect(options), function (t) {
-      var ref1Db = dbFactory(dbPath + '.ref')
-      var ref2Db = dbFactory(dbPath + '.ref2')
-      var base = dbFactory(dbPath)
+      var base = dbFactory(DB_PATH)
+      var ref1Db = dbFactory(DB_PATH + '.ref')
+      var ref2Db = dbFactory(DB_PATH + '.ref2')
       var sdb1 = subspace(base, 'test space')
-      var sdb2 = subspace(sdb1, 'inner space ')
+      var sdb2 = subspace(sdb1, 'inner space')
       var ref1List
       var ref2List
       var sdb1List
@@ -1009,9 +1004,9 @@ function run(dbFactory, hexNamespace, t) {
       function verify () {
         var done = after(3, function (err) {
           t.ifError(err, 'no error')
-          rimraf.sync(dbPath)
-          rimraf.sync(dbPath + '.ref')
-          rimraf.sync(dbPath + '.ref2')
+          drop(DB_PATH)
+          drop(DB_PATH + '.ref')
+          drop(DB_PATH + '.ref2')
           t.end()
         })
 
@@ -1024,7 +1019,7 @@ function run(dbFactory, hexNamespace, t) {
           sdb1List,
           ref1List,
           'test subspace db returned same entries as reference db'
-        )     
+        )
 
         t.equal(
           sdb2List.length,
@@ -1035,7 +1030,7 @@ function run(dbFactory, hexNamespace, t) {
           sdb2List,
           ref2List,
           'inner subspace db returned same entries as reference db'
-        )     
+        )
 
         ref1Db.close(done)
         ref2Db.close(done)
