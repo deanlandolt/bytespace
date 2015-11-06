@@ -227,7 +227,8 @@ function run(dbFactory, hexNamespace, t) {
           t.equal(err && err.notFound, true, 'notFound')
           t.equal(value, undefined)
           if (db !== base) {
-            t.equal(err && err.message, 'Key not found in database', 'message')
+            var expected = 'Key not found in database [baz' + i + ']'
+            t.equal(err && err.message, expected, 'message')
           }
           done()
         })

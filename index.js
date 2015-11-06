@@ -126,17 +126,22 @@ function Bytespace(db, ns, opts) {
       opts = getOptions(opts)
 
       try {
-        db.get(ns.encode(k, opts), kvOpts(opts), function (err, v) {
-          // sanitize full keypath for notFound errors
-          if (err && (err.notFound || NOT_FOUND.test(err))) {
-            err = new NotFoundError('Key not found in database', err)
-          }
-
-          cb(err, v)
-        })
+        db.get(ns.encode(k, opts), kvOpts(opts), handler)
       }
       catch (err) {
         process.nextTick(cb.bind(null, err))
+      }
+
+      function handler(err, v) {
+        // sanitize full keypath for notFound errors
+        if (err && err.notFound || NOT_FOUND.test(err)) {
+          try {
+            err = new NotFoundError('Key not found in database [' + k + ']')
+          }
+          catch (_) {}
+        }
+
+        cb(err, v)
       }
     }
   }
