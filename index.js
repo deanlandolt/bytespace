@@ -235,11 +235,14 @@ function Bytespace(db, ns, opts) {
       }
     }
 
-    space.pre = function (hook) {
+    space.pre = function (range, hook) {
+      // range is not (yet) implemented but here for sublevel compatibility
+      if (typeof range === 'function') hook = range
       return addHook(ns.prehooks, hook)
     }
 
-    space.post = function (hook) {
+    space.post = function (range, hook) {
+      if (typeof range === 'function') hook = range
       return addHook(ns.posthooks, hook)
     }
   }
