@@ -1240,4 +1240,30 @@ function run(dbFactory, hexNamespace, t) {
     })
 
   }))
+
+  t.test('precommit hooks, noop range argument', dbWrap(function (t, base) {
+    var db = subspace(base, 'test space 1', { valueEncoding: 'json' })
+
+    db.pre('this argument is ignored', function (op, add, ops) {
+      op.value*= 2
+    })
+
+    db.pre({ and: 'this too' }, function (op, add, ops) {
+      op.key = op.key.toUpperCase()
+    })
+
+    db.pre(function (op, add, ops) {
+      op.key+= op.key
+    })
+
+    db.put('foo', 2, function(err){
+      t.ifError(err, 'no put error')
+
+      db.get('FOOFOO', function(err, value){
+        t.ifError(err, 'no get error')
+        t.is(value, 4, 'value is doubled')
+        t.end()
+      })
+    })
+  }))
 }
