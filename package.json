@@ -4,6 +4,8 @@
   "description": "Efficient keypath subspaces prefixed with bytewise tuples",
   "main": "index.js",
   "scripts": {
+    "release:minor": "npm version minor && npm publish && git push --follow-tags",
+    "release:patch": "npm version patch && npm publish && git push --follow-tags",
     "test": "tape test | faucet"
   },
   "repository": {
