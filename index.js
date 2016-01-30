@@ -285,7 +285,8 @@ function Bytespace(db, ns, opts) {
 
     stream._transform = function (data, _, cb) {
       try {
-        if (opts.keys && opts.values) {
+        // decode keys even when keys or values aren't requested specifically
+        if ((opts.keys && opts.values) || (!opts.keys && !opts.values)) {
           data.key = ns.decode(data.key, opts)
         }
         else if (opts.keys) {
