@@ -173,11 +173,11 @@ function Bytespace(db, ns, opts) {
       cb = getCallback(opts, cb)
       opts = getOptions(opts)
 
-      function add(op) {    
-        if (op === false) {    
-          return delete ops[i]   
-        }    
-        ops.push(op)   
+      function add(op) {
+        if (op === false) {
+          return delete ops[i]
+        }
+        ops.push(op)
       }
 
       try {
@@ -217,14 +217,16 @@ function Bytespace(db, ns, opts) {
 
           // apply postcommit hooks for ops, setting encoded keys to initial state
           try {
-            if (ns.posthooks.length) {
-              ops.forEach(function (op) {
+            ops.forEach(function (op) {
+              var ns = op.prefix.namespace
+
+              if (ns.posthooks.length) {
                 ns.trigger(ns.posthooks, op.prefix, [ op ])
-              })
-            }
+              }
+            })
           }
           catch (err) {
-            cb(err)
+            return cb(err)
           }
 
           cb()
