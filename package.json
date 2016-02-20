@@ -6,7 +6,7 @@
   "scripts": {
     "release:minor": "npm version minor && npm publish && git push --follow-tags",
     "release:patch": "npm version patch && npm publish && git push --follow-tags",
-    "test": "tape test | faucet"
+    "test": "tape test/*.js | faucet"
   },
   "repository": {
     "type": "git",
