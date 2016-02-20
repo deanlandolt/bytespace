@@ -59,22 +59,22 @@ function Bytespace(db, ns, opts) {
   })
 
   // forward open and close events from base db w/o affecting listener count
-  function forwardOpen() {
+  ;(function forwardOpen() {
     db.once('open', function () {
       space.emit('open', space)
       forwardOpen()
     })
-  }
+  })()
 
   // TODO: level emits closed, multilevel emits close...damn...
-  function forwardClose() {
+  ;(function forwardClose() {
     var closeEvent = db.createRpcStream ? 'close' : 'closed'
     db.once(closeEvent, function () {
       // only emit 'close' for sanity's sake
       space.emit('close')
       forwardClose()
     })
-  }
+  })()
 
   // proxy `isOpen` to underlying db
   space.isOpen = function () {
